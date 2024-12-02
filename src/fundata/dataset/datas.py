@@ -16,29 +16,24 @@ logger = log(__name__)
 
 
 class DataSet:
-    """
-    """
+    """ """
 
-    def __init__(self, dataset: DatasetManage = None, data_path='./download/'):
-        """
-        """
+    def __init__(self, dataset: DatasetManage = None, data_path="./download/"):
+        """ """
         # 源文件保存目录
         self.dataset = dataset or DatasetManage()
         self.path_root = data_path
 
     def download(self, mode=1):
-        """
-        """
+        """ """
         pass
 
     def preprocess(self, step=0):
-        """
-        """
+        """ """
         pass
 
     def build_dataset(self):
-        """
-        """
+        """ """
         pass
 
 
@@ -47,54 +42,62 @@ class ElectronicsData(DataSet):
         super(ElectronicsData, self).__init__(*args, **kwargs)
 
         # 源文件
-        self.json_meta = self.path_root + '/electronics/meta_Electronics.json'
-        self.json_reviews = self.path_root + '/electronics/reviews_Electronics_5.json'
+        self.json_meta = self.path_root + "/electronics/meta_Electronics.json"
+        self.json_reviews = self.path_root + "/electronics/reviews_Electronics_5.json"
 
         # 格式化文件
-        self.pkl_meta = self.path_root + '/electronics/raw_data/meta.pkl'
-        self.pkl_reviews = self.path_root + '/electronics/raw_data/reviews.pkl'
+        self.pkl_meta = self.path_root + "/electronics/raw_data/meta.pkl"
+        self.pkl_reviews = self.path_root + "/electronics/raw_data/reviews.pkl"
 
         # 结果文件
-        self.pkl_remap = self.path_root + '/electronics/raw_data/remap.pkl'
-        self.pkl_dataset = self.path_root + '/electronics/raw_data/dataset.pkl'
+        self.pkl_remap = self.path_root + "/electronics/raw_data/remap.pkl"
+        self.pkl_dataset = self.path_root + "/electronics/raw_data/dataset.pkl"
 
     def download_raw_0(self, overwrite=False):
-        self.dataset.download('electronics-reviews',
-                              overwrite=overwrite, path_root=self.path_root)
-        self.dataset.download('electronics-meta',
-                              overwrite=overwrite, path_root=self.path_root)
+        self.dataset.download(
+            "electronics-reviews", overwrite=overwrite, path_root=self.path_root
+        )
+        self.dataset.download(
+            "electronics-meta", overwrite=overwrite, path_root=self.path_root
+        )
 
         logger.info("download done")
         logger.info("begin unzip file")
 
-        os.system('cd ' + self.path_root +
-                  '/electronics && gzip -d reviews_Electronics_5.json.gz')
-        os.system('cd ' + self.path_root +
-                  '/electronics && gzip -d meta_Electronics.json.gz')
+        os.system(
+            "cd "
+            + self.path_root
+            + "/electronics && gzip -d reviews_Electronics_5.json.gz"
+        )
+        os.system(
+            "cd " + self.path_root + "/electronics && gzip -d meta_Electronics.json.gz"
+        )
         logger.info("unzip done")
 
     def convert_pd_1(self, overwrite=False):
-        if exists_file(self.pkl_reviews, mkdir=True) and exists_file(self.pkl_meta, mkdir=True):
+        if exists_file(self.pkl_reviews, mkdir=True) and exists_file(
+            self.pkl_meta, mkdir=True
+        ):
             return
 
         def to_df(file_path):
-            with open(file_path, 'r') as fin:
+            with open(file_path, "r") as fin:
                 df = {}
                 i = 0
                 for line in fin:
                     df[i] = eval(line)
                     i += 1
-                df = pd.DataFrame.from_dict(df, orient='index')
+                df = pd.DataFrame.from_dict(df, orient="index")
                 return df
 
         reviews_df = to_df(self.json_reviews)
-        with open(self.pkl_reviews, 'wb') as f:
+        with open(self.pkl_reviews, "wb") as f:
             pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)
 
         meta_df = to_df(self.json_meta)
-        meta_df = meta_df[meta_df['asin'].isin(reviews_df['asin'].unique())]
+        meta_df = meta_df[meta_df["asin"].isin(reviews_df["asin"].unique())]
         meta_df = meta_df.reset_index(drop=True)
-        with open(self.pkl_meta, 'wb') as f:
+        with open(self.pkl_meta, "wb") as f:
             pickle.dump(meta_df, f, pickle.HIGHEST_PROTOCOL)
 
     def remap_id_2(self, overwrite=False):
@@ -104,12 +107,12 @@ class ElectronicsData(DataSet):
 
         # reviews
         reviews_df = pd.read_pickle(self.pkl_reviews)
-        reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+        reviews_df = reviews_df[["reviewerID", "asin", "unixReviewTime"]]
         # meta
         meta_df = pd.read_pickle(self.pkl_meta)
-        meta_df = meta_df[['asin', 'categories']]
+        meta_df = meta_df[["asin", "categories"]]
         # 类别只保留最后一个
-        meta_df['categories'] = meta_df['categories'].map(lambda x: x[-1][-1])
+        meta_df["categories"] = meta_df["categories"].map(lambda x: x[-1][-1])
 
         # with open(self.pkl_reviews, 'rb') as f:
         #     reviews_df = pickle.load(f)
@@ -134,48 +137,56 @@ class ElectronicsData(DataSet):
             return m, key
 
         # meta_df文件的物品ID映射
-        asin_map, asin_key = build_map(meta_df, 'asin')
+        asin_map, asin_key = build_map(meta_df, "asin")
         # meta_df文件物品种类映射
-        cate_map, cate_key = build_map(meta_df, 'categories')
+        cate_map, cate_key = build_map(meta_df, "categories")
         # reviews_df文件的用户ID映射
-        view_map, view_key = build_map(reviews_df, 'reviewerID')
+        view_map, view_key = build_map(reviews_df, "reviewerID")
 
         # user_count: 192403	item_count: 63001	cate_count: 801	example_count: 1689188
-        user_count, item_count, cate_count, example_count = \
-            len(view_map), len(asin_map), len(cate_map), reviews_df.shape[0]
-        logger.info('user_count: %d\t item_count: %d\t cate_count: %d\t example_count: %d' %
-                    (user_count, item_count, cate_count, example_count))
+        user_count, item_count, cate_count, example_count = (
+            len(view_map),
+            len(asin_map),
+            len(cate_map),
+            reviews_df.shape[0],
+        )
+        logger.info(
+            "user_count: %d\t item_count: %d\t cate_count: %d\t example_count: %d"
+            % (user_count, item_count, cate_count, example_count)
+        )
 
         # 按物品id排序，并重置索引
-        meta_df = meta_df.sort_values('asin')
+        meta_df = meta_df.sort_values("asin")
         meta_df = meta_df.reset_index(drop=True)
 
         # reviews_df文件物品id进行映射，并按照用户id、浏览时间进行排序，重置索引
-        reviews_df['asin'] = reviews_df['asin'].map(lambda x: asin_map[x])
-        reviews_df = reviews_df.sort_values(['reviewerID', 'unixReviewTime'])
+        reviews_df["asin"] = reviews_df["asin"].map(lambda x: asin_map[x])
+        reviews_df = reviews_df.sort_values(["reviewerID", "unixReviewTime"])
         reviews_df = reviews_df.reset_index(drop=True)
-        reviews_df = reviews_df[['reviewerID', 'asin', 'unixReviewTime']]
+        reviews_df = reviews_df[["reviewerID", "asin", "unixReviewTime"]]
 
         # 各个物品对应的类别
-        cate_list = np.array(meta_df['categories'], dtype='int32')
+        cate_list = np.array(meta_df["categories"], dtype="int32")
         # cate_list = [meta_df['categories'][i] for i in range(len(asin_map))]
         # cate_list = np.array(cate_list, dtype=np.int32)
 
         # 保存所需数据为pkl文件
-        with open(self.pkl_remap, 'wb') as f:
+        with open(self.pkl_remap, "wb") as f:
             pickle.dump(reviews_df, f, pickle.HIGHEST_PROTOCOL)  # uid, iid
             pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
-            pickle.dump((user_count, item_count, cate_count, example_count),
-                        f, pickle.HIGHEST_PROTOCOL)
-            pickle.dump((asin_key, cate_key, view_key),
-                        f, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(
+                (user_count, item_count, cate_count, example_count),
+                f,
+                pickle.HIGHEST_PROTOCOL,
+            )
+            pickle.dump((asin_key, cate_key, view_key), f, pickle.HIGHEST_PROTOCOL)
 
     def build_dataset_3(self, overwrite=False):
         random.seed(1234)
         if exists_file(self.pkl_dataset, mkdir=True):
             return
 
-        with open(self.pkl_remap, 'rb') as f:
+        with open(self.pkl_remap, "rb") as f:
             reviews_df = pickle.load(f)
             cate_list = pickle.load(f)
             user_count, item_count, cate_count, example_count = pickle.load(f)
@@ -189,9 +200,9 @@ class ElectronicsData(DataSet):
         共有n-2个训练集（第1个无浏览历史），第n个作为测试集。
         故测试集共有192403个，即用户的数量。训练集共2608764个
         """
-        for reviewerID, hist in reviews_df.groupby('reviewerID'):
+        for reviewerID, hist in reviews_df.groupby("reviewerID"):
             # 每个用户浏览过的物品，即为正样本
-            pos_list = hist['asin'].tolist()
+            pos_list = hist["asin"].tolist()
             max_sl = max(max_sl, len(pos_list))
 
             def gen_neg():
@@ -223,12 +234,13 @@ class ElectronicsData(DataSet):
         assert len(test_set) == user_count
 
         # 写入dataset.pkl文件
-        with open(self.pkl_dataset, 'wb') as f:
+        with open(self.pkl_dataset, "wb") as f:
             pickle.dump(train_set, f, pickle.HIGHEST_PROTOCOL)
             pickle.dump(test_set, f, pickle.HIGHEST_PROTOCOL)
             pickle.dump(cate_list, f, pickle.HIGHEST_PROTOCOL)
-            pickle.dump((user_count, item_count, cate_count,
-                         max_sl), f, pickle.HIGHEST_PROTOCOL)
+            pickle.dump(
+                (user_count, item_count, cate_count, max_sl), f, pickle.HIGHEST_PROTOCOL
+            )
 
     def init_data(self, overwrite=False):
         self.download_raw_0(overwrite=overwrite)
@@ -247,30 +259,29 @@ class ElectronicsData(DataSet):
             self.convert_pd_1()
             self.remap_id_2()
             self.build_dataset_3()
-        elif step == 1 or step == 'convert pd':
+        elif step == 1 or step == "convert pd":
             self.convert_pd_1()
-        elif step == 2 or step == 'remap id':
+        elif step == 2 or step == "remap id":
             self.remap_id_2()
-        elif step == 3 or step == 'build dataset':
+        elif step == 3 or step == "build dataset":
             self.build_dataset_3()
 
 
 class CriteoDataBak(DataSet):
     def __init__(self, *args, **kwargs):
         super(CriteoDataBak, self).__init__(*args, **kwargs)
-        self.criteo_sample = self.path_root+'/criteo/criteo_sample.txt'
-        self.criteo_kaggle = self.path_root+'/criteo/criteo_sample.txt'
-        self.criteo_kaggle_train = self.path_root+'/criteo/train.txt'
-        self.criteo_kaggle_test = self.path_root+'/criteo/test.txt'
+        self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
+        self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
+        self.criteo_kaggle_train = self.path_root + "/criteo/train.txt"
+        self.criteo_kaggle_test = self.path_root + "/criteo/test.txt"
         self.sample_num = 1000000
 
     def download(self, mode=1):
         if mode == 1:
-            self.dataset.download('criteo-sample', path_root=self.path_root)
+            self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
-            self.dataset.download('criteo-kaggle', path_root=self.path_root)
-            os.system('cd ' + self.path_root +
-                      '/criteo && tar -zxvf dac.tar.gz')
+            self.dataset.download("criteo-kaggle", path_root=self.path_root)
+            os.system("cd " + self.path_root + "/criteo && tar -zxvf dac.tar.gz")
 
     def preprocess(self, step=0):
         pass
@@ -283,7 +294,7 @@ class CriteoDataBak(DataSet):
         :param embed_dim: embedding dimension
         :return:
         """
-        return {'feat': feat, 'feat_num': feat_num, 'embed_dim': embed_dim}
+        return {"feat": feat, "feat_num": feat_num, "embed_dim": embed_dim}
 
     def _denseFeature(self, feat):
         """
@@ -291,9 +302,11 @@ class CriteoDataBak(DataSet):
         :param feat: dense feature name
         :return:
         """
-        return {'feat': feat}
+        return {"feat": feat}
 
-    def _create_criteo_dataset(self, file, embed_dim=8, read_part=True, sample_num=100000, test_size=0.2):
+    def _create_criteo_dataset(
+        self, file, embed_dim=8, read_part=True, sample_num=100000, test_size=0.2
+    ):
         """
         a example about creating criteo dataset
         :param file: dataset's path
@@ -303,23 +316,62 @@ class CriteoDataBak(DataSet):
         :param test_size: ratio of train dataset to test dataset
         :return: feature columns, train, test
         """
-        names = ['label', 'I1', 'I2', 'I3', 'I4', 'I5', 'I6', 'I7', 'I8', 'I9', 'I10', 'I11',
-                 'I12', 'I13', 'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10', 'C11',
-                 'C12', 'C13', 'C14', 'C15', 'C16', 'C17', 'C18', 'C19', 'C20', 'C21', 'C22',
-                 'C23', 'C24', 'C25', 'C26']
+        names = [
+            "label",
+            "I1",
+            "I2",
+            "I3",
+            "I4",
+            "I5",
+            "I6",
+            "I7",
+            "I8",
+            "I9",
+            "I10",
+            "I11",
+            "I12",
+            "I13",
+            "C1",
+            "C2",
+            "C3",
+            "C4",
+            "C5",
+            "C6",
+            "C7",
+            "C8",
+            "C9",
+            "C10",
+            "C11",
+            "C12",
+            "C13",
+            "C14",
+            "C15",
+            "C16",
+            "C17",
+            "C18",
+            "C19",
+            "C20",
+            "C21",
+            "C22",
+            "C23",
+            "C24",
+            "C25",
+            "C26",
+        ]
 
         if read_part:
-            data_df = pd.read_csv(file, sep='\t', iterator=True, header=None,
-                                  names=names)
+            data_df = pd.read_csv(
+                file, sep="\t", iterator=True, header=None, names=names
+            )
             data_df = data_df.get_chunk(sample_num)
 
         else:
-            data_df = pd.read_csv(file, sep=',', header=None, names=names)
+            data_df = pd.read_csv(file, sep=",", header=None, names=names)
 
-        sparse_features = ['C' + str(i) for i in range(1, 27)]
-        dense_features = ['I' + str(i) for i in range(1, 14)]
+        sparse_features = ["C" + str(i) for i in range(1, 27)]
+        dense_features = ["I" + str(i) for i in range(1, 14)]
 
-        data_df[sparse_features] = data_df[sparse_features].fillna('-1')
+        data_df[sparse_features] = data_df[sparse_features].fillna("-1")
         data_df[dense_features] = data_df[dense_features].fillna(0)
 
         for feat in sparse_features:
@@ -329,23 +381,33 @@ class CriteoDataBak(DataSet):
         # ==============Feature Engineering===================
 
         dense_features = [
-            feat for feat in data_df.columns if feat not in sparse_features + ['label']]
+            feat for feat in data_df.columns if feat not in sparse_features + ["label"]
+        ]
 
         mms = MinMaxScaler(feature_range=(0, 1))
         data_df[dense_features] = mms.fit_transform(data_df[dense_features])
 
-        feature_columns = [[self._denseFeature(feat) for feat in dense_features]] + \
-            [[self._sparseFeature(feat, len(data_df[feat].unique()), embed_dim=embed_dim)
-              for feat in sparse_features]]
+        feature_columns = [[self._denseFeature(feat) for feat in dense_features]] + [
+            [
+                self._sparseFeature(
+                    feat, len(data_df[feat].unique()), embed_dim=embed_dim
+                )
+                for feat in sparse_features
+            ]
+        ]
 
         train, test = train_test_split(data_df, test_size=test_size)
 
-        train_X = [train[dense_features].values,
-                   train[sparse_features].values.astype('int32')]
-        train_y = train['label'].values.astype('int32')
-        test_X = [test[dense_features].values,
-                  test[sparse_features].values.astype('int32')]
-        test_y = test['label'].values.astype('int32')
+        train_X = [
+            train[dense_features].values,
+            train[sparse_features].values.astype("int32"),
+        ]
+        train_y = train["label"].values.astype("int32")
+        test_X = [
+            test[dense_features].values,
+            test[sparse_features].values.astype("int32"),
+        ]
+        test_y = test["label"].values.astype("int32")
 
         return feature_columns, (train_X, train_y), (test_X, test_y)
 
@@ -353,29 +415,38 @@ class CriteoDataBak(DataSet):
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:
-            return self._create_criteo_dataset(self.criteo_kaggle_train, read_part=True, sample_num=self.sample_num)
+            return self._create_criteo_dataset(
+                self.criteo_kaggle_train, read_part=True, sample_num=self.sample_num
+            )
 
 
 class CriteoData(DataSet):
     def __init__(self, *args, **kwargs):
         super(CriteoData, self).__init__(*args, **kwargs)
-        self.criteo_sample = self.path_root + '/criteo/criteo_sample.txt'
-        self.criteo_kaggle = self.path_root + '/criteo/criteo_sample.txt'
-        self.criteo_kaggle_train = self.path_root + '/criteo/train.txt'
-        self.criteo_kaggle_test = self.path_root + '/criteo/test.txt'
+        self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
+        self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
+        self.criteo_kaggle_train = self.path_root + "/criteo/train.txt"
+        self.criteo_kaggle_test = self.path_root + "/criteo/test.txt"
 
-        self.feature_file = self.path_root + '/criteo/feature_layers.json'
+        self.feature_file = self.path_root + "/criteo/feature_layers.json"
         self.sample_num = 1000000
 
     def download(self, mode=1):
         if mode == 1:
-            self.dataset.download('criteo-sample', path_root=self.path_root)
+            self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
-            self.dataset.download('criteo-kaggle', path_root=self.path_root)
-            os.system('cd ' + self.path_root +
-                      '/criteo && tar -zxvf dac.tar.gz')
+            self.dataset.download("criteo-kaggle", path_root=self.path_root)
+            os.system("cd " + self.path_root + "/criteo && tar -zxvf dac.tar.gz")
 
-    def _create_criteo_dataset(self, file, embed_dim=8, read_part=True, sample_num=100000, test_size=0.2, batch_size=128):
+    def _create_criteo_dataset(
+        self,
+        file,
+        embed_dim=8,
+        read_part=True,
+        sample_num=100000,
+        test_size=0.2,
+        batch_size=128,
+    ):
         """
         a example about creating criteo dataset
         :param file: dataset's path
@@ -385,20 +456,20 @@ class CriteoData(DataSet):
         :param test_size: ratio of train dataset to test dataset
         :return: feature columns, train, test
         """
-        dense_features = ['I' + str(i) for i in range(1, 14)]
-        sparse_features = ['C' + str(i) for i in range(1, 27)]
-        names = ['label', *dense_features, *sparse_features]
+        dense_features = ["I" + str(i) for i in range(1, 14)]
+        sparse_features = ["C" + str(i) for i in range(1, 27)]
+        names = ["label", *dense_features, *sparse_features]
 
         if read_part:
             data_df = pd.read_csv(
-                file, sep='\t', iterator=True, header=None, names=names)
+                file, sep="\t", iterator=True, header=None, names=names
+            )
             data_df = data_df.get_chunk(sample_num)
         else:
-            data_df = pd.read_csv(file, sep=',', header=None, names=names)
+            data_df = pd.read_csv(file, sep=",", header=None, names=names)
 
-        data_df[dense_features] = data_df[dense_features].fillna(
-            0.).astype('float32')
-        data_df[sparse_features] = data_df[sparse_features].fillna('-1')
+        data_df[dense_features] = data_df[dense_features].fillna(0.0).astype("float32")
+        data_df[sparse_features] = data_df[sparse_features].fillna("-1")
 
         for feat in sparse_features:
             le = LabelEncoder()
@@ -407,19 +478,25 @@ class CriteoData(DataSet):
         sparse_json_embedding, sparse_json_onehot = [], []
         for feat in sparse_features:
             vocabulary = [i for i in data_df[feat].unique()]
-            sparse_json_embedding.append(define_feature_json(feat,
-                                                             feature_type='CateEmbeddingColumn',
-                                                             dimension=embed_dim,
-                                                             share_name=feat + '-emb',
-                                                             vocabulary_size=len(
-                                                                 vocabulary),
-                                                             dtype='int'))
-            sparse_json_onehot.append(define_feature_json(feat,
-                                                          feature_type='CateOneHotColumn',
-                                                          dimension=embed_dim,
-                                                          num_buckets=len(
-                                                              vocabulary),
-                                                          dtype='int'))
+            sparse_json_embedding.append(
+                define_feature_json(
+                    feat,
+                    feature_type="CateEmbeddingColumn",
+                    dimension=embed_dim,
+                    share_name=feat + "-emb",
+                    vocabulary_size=len(vocabulary),
+                    dtype="int",
+                )
+            )
+            sparse_json_onehot.append(
+                define_feature_json(
+                    feat,
+                    feature_type="CateOneHotColumn",
+                    dimension=embed_dim,
+                    num_buckets=len(vocabulary),
+                    dtype="int",
+                )
+            )
 
         mms = MinMaxScaler(feature_range=(0, 1))
         data_df[dense_features] = mms.fit_transform(data_df[dense_features])
@@ -428,8 +505,8 @@ class CriteoData(DataSet):
 
         def df_to_dataset(dataframe, shuffle=True, batch_size=32):
             dataframe = dataframe.copy()
-            labels = dataframe.pop('label')
-            data = dataframe.to_dict(orient='list')
+            labels = dataframe.pop("label")
+            data = dataframe.to_dict(orient="list")
             ds = tf.data.Dataset.from_tensor_slices((data, labels))
 
             if shuffle:
@@ -441,22 +518,20 @@ class CriteoData(DataSet):
         test_d = df_to_dataset(test, batch_size=batch_size)
 
         feature_layers = {
-            'num-layer': {
+            "num-layer": {
                 "type": "single",
-                "inputs": [define_feature_json(key=name, feature_type='NumericColumn', dtype='float32') for name
-                           in dense_features]
+                "inputs": [
+                    define_feature_json(
+                        key=name, feature_type="NumericColumn", dtype="float32"
+                    )
+                    for name in dense_features
+                ],
             },
-            'cate-embedding': {
-                "type": "single",
-                "inputs": sparse_json_embedding
-            },
-            'cate-onehot': {
-                "type": "single",
-                "inputs": sparse_json_onehot
-            }
+            "cate-embedding": {"type": "single", "inputs": sparse_json_embedding},
+            "cate-onehot": {"type": "single", "inputs": sparse_json_onehot},
         }
 
-        with open(self.feature_file, 'w') as writer:
+        with open(self.feature_file, "w") as writer:
             writer.write(demjson.encode(feature_layers))
 
         return feature_layers, train_d, test_d
@@ -466,4 +541,9 @@ class CriteoData(DataSet):
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:
-            return self._create_criteo_dataset(self.criteo_kaggle_train, read_part=True, sample_num=self.sample_num, batch_size=batch_size)
+            return self._create_criteo_dataset(
+                self.criteo_kaggle_train,
+                read_part=True,
+                sample_num=self.sample_num,
+                batch_size=batch_size,
+            )

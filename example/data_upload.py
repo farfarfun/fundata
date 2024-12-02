@@ -16,13 +16,13 @@ def example1():
 
 
 def example2():
-    file_path = '/Users/liangtaoniu/workspace/MyDiary/tmp/weights/yolov3.weight'
+    file_path = "/Users/liangtaoniu/workspace/MyDiary/tmp/weights/yolov3.weight"
     downer.upload_file(file_path=file_path)
 
 
 def example3():
-    print('download')
-    download('https://wws.lanzous.com/izZmlfjulvg', dir_pwd='./download/test')
+    print("download")
+    download("https://wws.lanzous.com/izZmlfjulvg", dir_pwd="./download/test")
 
     # download('https://wws.lanzous.com/b01hjn3aj', dir_pwd='./download/lanzou')
 
@@ -49,7 +49,9 @@ def example4():
 
     # res = downer.upload_file('/Users/liangtaoniu/workspace/dataset/models/ml-25m.zip', folder_id=2184164)
     # res = downer.upload_file('/Users/liangtaoniu/workspace/dataset/models/train_data.csv', folder_id=2214573)
-    res = downer.upload_file('/Users/liangtaoniu/workspace/dataset/models/label_file.csv', folder_id=2214573)
+    res = downer.upload_file(
+        "/Users/liangtaoniu/workspace/dataset/models/label_file.csv", folder_id=2214573
+    )
 
     print(res)
     pass

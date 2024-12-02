@@ -7,27 +7,28 @@ logger = log(__name__)
 
 
 def get_electronics(dataset: DatasetManage = None):
-    electronic = ElectronicsData(dataset=dataset, data_path='./download/')
+    electronic = ElectronicsData(dataset=dataset, data_path="./download/")
     electronic.init_data()
 
 
 def get_movielens(dataset: DatasetManage = None):
-    dataset.download('movielens-100k', overwrite=False)
-    dataset.download('movielens-1m', overwrite=False)
-    dataset.download('movielens-10m', overwrite=False)
-    dataset.download('movielens-20m', overwrite=False)
-    dataset.download('movielens-25m', overwrite=False)
+    dataset.download("movielens-100k", overwrite=False)
+    dataset.download("movielens-1m", overwrite=False)
+    dataset.download("movielens-10m", overwrite=False)
+    dataset.download("movielens-20m", overwrite=False)
+    dataset.download("movielens-25m", overwrite=False)
     # os.system('cd ' + file_path(data.path) + ' && unzip ' + file_name(data.path))
 
 
 def get_adult_data(dataset: DatasetManage = None):
-    data_train = dataset.download('adult-train', overwrite=False)
-    data_test = dataset.download('adult-test', overwrite=False)
+    data_train = dataset.download("adult-train", overwrite=False)
+    data_test = dataset.download("adult-test", overwrite=False)
 
     print(data_test)
-    train_data = pd.read_table(data_train.path, header=None, delimiter=',')
+    train_data = pd.read_table(data_train.path, header=None, delimiter=",")
     test_data = pd.read_table(
-        data_test.path, header=None, delimiter=',', error_bad_lines=False)
+        data_test.path, header=None, delimiter=",", error_bad_lines=False
+    )
 
     # all_columns = ['age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 'occupation',
     #                'relationship', 'race', 'sex', 'capital-gain', 'capital-loss', 'hours-per-week', 'native-country',
@@ -65,9 +66,9 @@ def get_adult_data(dataset: DatasetManage = None):
 
 
 def get_porto_seguro_data(dataset: DatasetManage = None):
-    dataset.download('porto-seguro-train')
-    dataset.download('porto-seguro-test')
+    dataset.download("porto-seguro-train")
+    dataset.download("porto-seguro-test")
 
 
 def get_bitly_usagov_data(dataset: DatasetManage = None):
-    dataset.download('bitly-usagov')
+    dataset.download("bitly-usagov")

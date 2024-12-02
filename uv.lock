@@ -1,0 +1,7 @@
+version = 1
+requires-python = ">=3.8"
+
+[[package]]
+name = "fundata"
+version = "1.0.1"
+source = { virtual = "." }

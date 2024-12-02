@@ -14,7 +14,7 @@ class BaseTable:
     表维度的底层数据库的通用实现
     """
 
-    def __init__(self, table_name: str = 'default_table', columns: List[str] = None):
+    def __init__(self, table_name: str = "default_table", columns: List[str] = None):
         """
         初始化一个通用数据库
         :param table_name: 表名
@@ -41,9 +41,9 @@ class BaseTable:
         properties = self.encode(properties)
         keys, values = self._properties2kv(properties)
 
-        sql = """insert or ignore into {table_name} ({columns}) values ({value})""".format(table_name=self.table_name,
-                                                                                           columns=', '.join(keys),
-                                                                                           value=', '.join(values))
+        sql = """insert or ignore into {table_name} ({columns}) values ({value})""".format(
+            table_name=self.table_name, columns=", ".join(keys), value=", ".join(values)
+        )
         return self.execute(sql)
 
     def update(self, properties: dict, condition: dict):
@@ -56,7 +56,9 @@ class BaseTable:
         properties = self.encode(properties)
         equal = self._condition2equal(properties)
         equal2 = self._condition2equal(condition)
-        sql = """update  {} set {} where {}""".format(self.table_name, ', '.join(equal), ' and '.join(equal2))
+        sql = """update  {} set {} where {}""".format(
+            self.table_name, ", ".join(equal), " and ".join(equal2)
+        )
         return self.execute(sql)
 
     def update_or_insert(self, properties: dict, condition: dict = None):
@@ -99,11 +101,13 @@ class BaseTable:
         properties = properties or {}
         values = []
         for key in self.columns:
-            value = str(properties.get(key, ''))
+            value = str(properties.get(key, ""))
             if len(value) > 0 and len(key) > 0:
                 values.append("{}='{}'".format(key, value))
 
-        sql = """select count(1) from {} where {}""".format(self.table_name, ' and '.join(values))
+        sql = """select count(1) from {} where {}""".format(
+            self.table_name, " and ".join(values)
+        )
 
         rows = self.execute(sql)
         for row in rows:
@@ -125,7 +129,9 @@ class BaseTable:
         """
         if sql is None:
             equal2 = self._condition2equal(condition)
-            sql = """select * from {} where {}""".format(self.table_name, ' and '.join(equal2))
+            sql = """select * from {} where {}""".format(
+                self.table_name, " and ".join(equal2)
+            )
         else:
             sql = self.sql_format(sql)
 
@@ -143,7 +149,7 @@ class BaseTable:
         keys = []
         values = []
         for key in self.columns:
-            value = str(properties.get(key, '')).replace("'", '')
+            value = str(properties.get(key, "")).replace("'", "")
             if len(key) > 0 and len(value) > 0:
                 keys.append(key)
                 values.append("'{}'".format(value))
@@ -175,7 +181,7 @@ class BaseTable:
         :param sql: sql
         :return: 格式化之后的sql
         """
-        sql = sql.replace('table_name', self.table_name)
+        sql = sql.replace("table_name", self.table_name)
         return sql
 
     def delete(self, condition=None):
@@ -189,7 +195,9 @@ class BaseTable:
         elif isinstance(condition, str):
             sql = "delete from {} where {}".format(self.table_name, condition)
         elif isinstance(condition, dict):
-            sql = "delete from {} where {}".format(self.table_name, self._condition2equal(condition))
+            sql = "delete from {} where {}".format(
+                self.table_name, self._condition2equal(condition)
+            )
         else:
             sql = None
         if sql is not None:
@@ -243,8 +251,12 @@ class SqliteTable(BaseTable):
         result = pd.read_sql("select * from {}".format(self.table_name), self.conn)
 
         count = len(result)
-        path = ('{}/{}-{}-{}'.format(os.path.dirname(self.db_path), self.table_name, count,
-                                     strftime("%Y%m%d#%H:%M:%S", time.localtime())))
+        path = "{}/{}-{}-{}".format(
+            os.path.dirname(self.db_path),
+            self.table_name,
+            count,
+            strftime("%Y%m%d#%H:%M:%S", time.localtime()),
+        )
         result.to_csv(path)
         self.logger.info("save to csv:{}->{}".format(count, path))
 
@@ -259,14 +271,17 @@ class SqliteTable(BaseTable):
         else:
             sql = "select * from {} where {}".format(self.table_name, condition)
 
-        path = path or ('{}/{}-{}'.format(os.path.dirname(self.db_path), self.table_name,
-                                          strftime("%Y%m%d#%H:%M:%S", time.localtime())))
+        path = path or (
+            "{}/{}-{}".format(
+                os.path.dirname(self.db_path),
+                self.table_name,
+                strftime("%Y%m%d#%H:%M:%S", time.localtime()),
+            )
+        )
         self.logger.info("save to csv -> {}".format(path))
 
         cmd = 'sqlite3 -header -csv {db_path} "{sql};" > {path}'.format(
-            db_path=self.db_path,
-            path=path,
-            sql=sql
+            db_path=self.db_path, path=path, sql=sql
         )
         run_shell(cmd)
         if pop:
@@ -290,8 +305,13 @@ class SqliteTable(BaseTable):
         :param property_list:
         :return:
         """
-        values = [tuple([properties.get(key, '') for key in self.columns]) for properties in property_list]
-        sql = "insert or ignore into {} values ({})".format(self.table_name, ','.join(['?'] * len(self.columns)))
+        values = [
+            tuple([properties.get(key, "") for key in self.columns])
+            for properties in property_list
+        ]
+        sql = "insert or ignore into {} values ({})".format(
+            self.table_name, ",".join(["?"] * len(self.columns))
+        )
 
         self.cursor.executemany(sql, values)
         self.conn.commit()

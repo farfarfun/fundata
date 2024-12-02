@@ -6,18 +6,18 @@ from notedata.manage import DatasetManage
 dataset = DatasetManage()
 random.seed(1234)
 
-data_root = '/Users/liangtaoniu/tmp/dataset/electronics'
+data_root = "/Users/liangtaoniu/tmp/dataset/electronics"
 print("read and process data")
 
-with open('{}/raw_data/remap.pkl'.format(data_root), 'rb') as f:
+with open("{}/raw_data/remap.pkl".format(data_root), "rb") as f:
     reviews_df = pickle.load(f)
     cate_list = pickle.load(f)
     user_count, item_count, cate_count, example_count = pickle.load(f)
 
 train_set = []
 test_set = []
-for reviewerID, hist in reviews_df.groupby('reviewerID'):
-    pos_list = hist['asin'].tolist()
+for reviewerID, hist in reviews_df.groupby("reviewerID"):
+    pos_list = hist["asin"].tolist()
 
     def gen_neg():
         neg = pos_list[0]
@@ -46,9 +46,9 @@ def print_to_file(data, fout):
     for i in range(len(data)):
         fout.write(str(data[i]))
         if i != len(data) - 1:
-            fout.write(' ')
+            fout.write(" ")
         else:
-            fout.write(';')
+            fout.write(";")
 
 
 print("make train data")
@@ -84,7 +84,7 @@ with open("{}/paddle_test.txt".format(data_root), "w") as fout:
         fout.write("0\n")
 
 print("make config data")
-with open('{}/config.txt'.format(data_root), 'w') as f:
+with open("{}/config.txt".format(data_root), "w") as f:
     f.write(str(user_count) + "\n")
     f.write(str(item_count) + "\n")
     f.write(str(cate_count) + "\n")

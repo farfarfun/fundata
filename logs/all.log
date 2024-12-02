@@ -1,0 +1,3 @@
+2024-12-02 15:12:57.296 |INFO    | funbuild.core.core : core:  77 | funbuild | - fundata build
+2024-12-02 15:12:57.297 |INFO    | funbuild.core.core : core:  65 | funbuild | - fundata pull
+2024-12-02 15:13:03.084 |INFO    | funbuild.core.core : core:  69 | funbuild | - fundata push
