@@ -5,6 +5,10 @@ example/download/*
 */__pycache__
 *.pyc
 
+# 数据目录索引缓存：内容与 manage/library.py 的 insert_library() 完全一致，
+# 通过 `from fundata.manage import insert_library; insert_library()` 即可重建
+src/fundata/manage/dataset.db
+
 # ---- AI 编码助手 ----
 # 只忽略本地状态；团队有意共享的 agent / 命令 / 规则定义仍然版本化。
 # 必须写 `dir/*` 而不是 `dir/`：父目录被整体排除后 git 不会下探，
