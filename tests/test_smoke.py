@@ -4,61 +4,28 @@ Background / import-path notes
 -------------------------------
 The published distribution name and the importable top-level package
 both use the *current* name: ``import fundata`` (NOT the legacy
-``notedata`` name). This was verified against ``pyproject.toml``
-(``name = "fundata"``) and ``src/fundata/__init__.py``.
+``notedata`` name).
 
-However, several internal submodules still reach for the OLD ``note*``
-package names instead of the local ``fundata`` package, and those old
-packages are no longer reliably installable:
+As of farfarfun/todo-list#154, ``fundata.work``, ``fundata.manage`` and
+``fundata.tables_bak`` no longer reach for the dead ``notetool`` /
+``notedrive`` package names -- they now use a local ``fundata._util``
+helper, a real current dependency (``funshell``, ``funutil``), or (for
+``manage.core.DatasetManage.download``'s lanzou branch, which had no
+drop-in replacement in the current ``fundrive`` API) raise
+``NotImplementedError`` instead of failing at import time.
 
-* ``fundata.work``, ``fundata.manage``, ``fundata.tables_bak`` and
-  ``fundata.dataset`` all import from ``notetool`` (e.g.
-  ``from notetool.tool.path import exist_and_create``). ``notetool``
-  does not exist on PyPI at all (``https://pypi.org/pypi/notetool/json``
-  -> 404); the organisation appears to have renamed it to ``funtool``,
-  but ``fundata``'s source was never updated to match. This looks like
-  the same "incomplete rename" pattern flagged for this repo.
-* ``fundata.manage`` also imports ``notedrive.lanzou``. ``notedrive``
-  does exist on PyPI, but it in turn depends on ``demjson``, which fails
-  to build on modern setuptools/Python (``error in demjson setup
-  command: use_2to3 is invalid``), so ``notedrive`` cannot actually be
-  installed in a fresh environment either.
-* ``fundata.dataset`` additionally imports ``from notedata.manage import
-  DatasetManage`` (``dataset/core.py``, ``dataset/datas.py``,
-  ``dataset/images.py``) instead of the local ``fundata.manage``.
-  ``notedata`` is still separately published on PyPI, but its own
-  metadata declares a hard dependency on the (nonexistent) ``notetool``,
-  so it can never be installed either. ``fundata.dataset`` also needs
-  tensorflow / notekeras / demjson / scikit-learn.
-* The ``example/`` scripts in this repo (``example/run.py``,
-  ``example/dataset.py``) literally import ``notedata`` directly,
-  which corroborates that this is a pre-existing, real bug rather than
-  something introduced by this test suite.
-
-None of this is fixed here (out of scope for a smoke-test-only change;
-would require a source-level rename/refactor). Submodules that cannot be
-meaningfully imported/exercised without real network access or
-non-installable third-party packages are explicitly skipped below with
-the reason spelled out, rather than silently omitted or faked as
-passing.
-
-For ``fundata.work`` and ``fundata.tables_bak`` the *only* missing piece
-is a small filesystem/logging helper from ``notetool``
-(``exist_and_create``, ``log``) that this test never needs to actually
-touch the filesystem/network for, so it is stubbed out via
-``sys.modules`` (same spirit as mocking a filesystem call) so the real
-``fundata`` logic underneath can still be genuinely smoke tested.
+``fundata.dataset`` is a separate, still-unresolved case: on top of the
+now-fixed ``notedata.manage`` self-import, ``dataset/datas.py`` also
+imports ``demjson`` / ``tensorflow`` / ``notekeras`` directly, none of
+which are declared dependencies or installed here. That's a distinct,
+pre-existing problem (missing/dead heavy ML deps) unrelated to the
+note*->fun* renames #154 covers, so ``fundata.dataset`` still cannot be
+imported -- documented and skipped below rather than faked as passing.
 """
 
 import logging
-import sys
-import types
 
 import pytest
-
-
-def _fake_module(name):
-    return types.ModuleType(name)
 
 
 def test_import_top_level_package():
@@ -73,31 +40,10 @@ def test_import_paths_submodule():
     import fundata.paths  # noqa: F401
 
 
-def test_work_app_smoke(monkeypatch):
-    """fundata.work.WorkApp: construct + path helpers, with the filesystem
-    creation call (`notetool.tool.path.exist_and_create`) stubbed out so
-    no real directories are touched and the missing `notetool` package
-    doesn't block the import.
-    """
-    from unittest.mock import MagicMock
-
-    fake_notetool = _fake_module("notetool")
-    fake_notetool_tool = _fake_module("notetool.tool")
-    fake_notetool_tool_path = _fake_module("notetool.tool.path")
-    exist_and_create = MagicMock(name="exist_and_create")
-    fake_notetool_tool_path.exist_and_create = exist_and_create
-    fake_notetool_tool.path = fake_notetool_tool_path
-    fake_notetool.tool = fake_notetool_tool
-
-    monkeypatch.setitem(sys.modules, "notetool", fake_notetool)
-    monkeypatch.setitem(sys.modules, "notetool.tool", fake_notetool_tool)
-    monkeypatch.setitem(sys.modules, "notetool.tool.path", fake_notetool_tool_path)
-    # fundata.work / fundata.work.core may already be cached from a
-    # previous (failed) import attempt in this session; drop them so the
-    # stub above is actually used.
-    monkeypatch.delitem(sys.modules, "fundata.work", raising=False)
-    monkeypatch.delitem(sys.modules, "fundata.work.core", raising=False)
-
+def test_work_app_smoke():
+    """fundata.work.WorkApp: construct + path helpers, real filesystem
+    creation via fundata._util.exist_and_create (no more notetool stub
+    needed post-#154)."""
     import fundata.work as work
 
     app = work.WorkApp(app_name="smoke-test-app", dir_app="/tmp/fundata-smoke-app")
@@ -107,10 +53,9 @@ def test_work_app_smoke(monkeypatch):
     assert app.log_file("info.log") == "/tmp/fundata-smoke-app/logs/info.log"
     assert app.common_file("temp.txt") == "/tmp/fundata-smoke-app/common/temp.txt"
 
-    # create() should delegate directory creation to the (stubbed)
-    # filesystem helper rather than doing raw os calls itself.
     app.create()
-    assert exist_and_create.call_count == 4
+    for d in (app.dir_app, app.dir_db, app.dir_log, app.dir_common):
+        assert __import__("os").path.isdir(d)
 
     # module-level convenience functions
     assert work.db_file(app_name="smoke-test-app", file_name="d.db").endswith(
@@ -121,27 +66,13 @@ def test_work_app_smoke(monkeypatch):
     )
 
 
-def test_tables_bak_base_table_smoke(monkeypatch):
-    """fundata.tables_bak.BaseTable: pure SQL-string-building logic, with
-    only the `notetool.tool.log` logging helper stubbed out (a real
-    `logging.getLogger` is used, so behaviour stays faithful) to work
-    around the missing `notetool` package.
-    """
-    fake_notetool = _fake_module("notetool")
-    fake_notetool_tool = _fake_module("notetool.tool")
-    fake_notetool_tool.log = lambda name: logging.getLogger(name)
-    fake_notetool.tool = fake_notetool_tool
-
-    monkeypatch.setitem(sys.modules, "notetool", fake_notetool)
-    monkeypatch.setitem(sys.modules, "notetool.tool", fake_notetool_tool)
-    monkeypatch.delitem(sys.modules, "fundata.tables_bak", raising=False)
-    monkeypatch.delitem(sys.modules, "fundata.tables_bak.core", raising=False)
-
+def test_tables_bak_base_table_smoke():
+    """fundata.tables_bak.BaseTable: pure SQL-string-building logic."""
     from fundata.tables_bak.core import BaseTable
 
     table = BaseTable(table_name="demo", columns=["id", "name"])
     assert table.table_name == "demo"
-    assert isinstance(table.logger, logging.Logger)
+    assert table.logger is not None
 
     keys, values = table._properties2kv({"id": "1", "name": "a"})
     assert keys == ["id", "name"]
@@ -159,7 +90,7 @@ def test_tables_bak_base_table_smoke(monkeypatch):
         table.execute("select 1")
 
 
-def test_tables_bak_sqlite_table_crud_smoke(tmp_path, monkeypatch):
+def test_tables_bak_sqlite_table_crud_smoke(tmp_path):
     """fundata.tables_bak.SqliteTable against a throwaway local sqlite
     file under pytest's tmp_path (no network, no credentials, no shared
     state) -- exercises real insert/select/update logic.
@@ -168,16 +99,6 @@ def test_tables_bak_sqlite_table_crud_smoke(tmp_path, monkeypatch):
     see `test_tables_bak_delete_condition_bug` below for a real bug found
     in that method (reported, not fixed, per audit scope).
     """
-    fake_notetool = _fake_module("notetool")
-    fake_notetool_tool = _fake_module("notetool.tool")
-    fake_notetool_tool.log = lambda name: logging.getLogger(name)
-    fake_notetool.tool = fake_notetool_tool
-
-    monkeypatch.setitem(sys.modules, "notetool", fake_notetool)
-    monkeypatch.setitem(sys.modules, "notetool.tool", fake_notetool_tool)
-    monkeypatch.delitem(sys.modules, "fundata.tables_bak", raising=False)
-    monkeypatch.delitem(sys.modules, "fundata.tables_bak.core", raising=False)
-
     from fundata.tables_bak.core import SqliteTable
 
     db_path = tmp_path / "smoke.db"
@@ -199,7 +120,7 @@ def test_tables_bak_sqlite_table_crud_smoke(tmp_path, monkeypatch):
         table.close()
 
 
-def test_tables_bak_delete_condition_bug(tmp_path, monkeypatch):
+def test_tables_bak_delete_condition_bug(tmp_path):
     """Found a real bug while smoke testing: `BaseTable.delete()` with a
     dict `condition` builds its SQL as::
 
@@ -232,59 +153,73 @@ def test_tables_bak_delete_condition_bug(tmp_path, monkeypatch):
     )
 
 
-def test_import_manage_submodule_requires_unavailable_deps():
-    """fundata.manage.DatasetManage subclasses `notetool.database.SqliteTable`
-    and its `download()` method unconditionally hits the network (lanzou
-    file hosting) via `notedrive.lanzou.download`.
+def test_manage_dataset_manage_smoke(tmp_path):
+    """fundata.manage.DatasetManage now imports cleanly post-#154 (subclasses
+    the local fundata.tables_bak.core.SqliteTable instead of the dead
+    notetool.database.SqliteTable). Exercise real CRUD against a throwaway
+    sqlite db; the lanzou-download branch still can't be smoke tested
+    (needs real credentials/network) so it's left untouched here."""
+    from fundata.manage.core import DatasetManage
 
-    - `notetool` does not exist on PyPI (404), so `notetool.database`
-      cannot be installed/imported at all.
-    - `notedrive` exists on PyPI, but its own dependency `demjson` fails
-      to build on this environment (`use_2to3 is invalid`), so it cannot
-      be installed either.
+    db_path = tmp_path / "datasets.db"
+    dataset = DatasetManage(db_path=str(db_path))
+    dataset.create()
 
-    With both of the class's dependencies unavailable, and its own
-    behaviour requiring real network access, this cannot be reasonably
-    smoke tested even with mocking (doing so would require reimplementing
-    a third-party base class from scratch). Skipping per audit guidance
-    instead of faking a pass; reported as a finding.
-    """
-    pytest.skip(
-        "需要真实凭据/网络，跳过：fundata.manage.DatasetManage 依赖 PyPI 上已不存在的 "
-        "notetool 包（notetool.database.SqliteTable）以及构建失败的 notedrive"
-        "（其依赖 demjson 在现代 setuptools/Python 下报错 'use_2to3 is invalid' 无法构建），"
-        "且 download() 方法会真实请求蓝奏云下载文件。在不重新实现第三方基类的前提下，"
-        "无法对其进行有意义的 mock 冒烟测试，已作为发现问题记录，未修复源码。"
+    dataset.execute(
+        "insert into datasets (name, category, urls) values ('demo', 'cat', '{}')"
     )
+    rows = dataset.select("select * from datasets")
+    assert len(rows) == 1
+    assert rows[0]["name"] == "demo"
+    dataset.close()
+
+
+def test_manage_lanzou_download_not_implemented(tmp_path):
+    """The lanzou branch of DatasetManage.download() has no drop-in
+    replacement for the removed notedrive.lanzou.download free function
+    (current fundrive.drives.lanzou.LanZouDrive is class-based and needs
+    an authenticated instance) -- it now raises NotImplementedError
+    instead of ImportError-ing the whole module. See #154.
+
+    Note: DatasetManage.decode() does `json.loads(json.loads(urls))` --
+    i.e. it expects `urls` to be *double* JSON-encoded -- while
+    `encode()` (used by `insert()`) only encodes it *once*. That
+    asymmetry is a separate, pre-existing bug (same flavour as the
+    `delete()` condition bug above); this test works around it by
+    storing a double-encoded value directly so `decode()` succeeds and
+    execution actually reaches the lanzou branch under test.
+    """
+    import json
+
+    from fundata.manage.core import DatasetManage
+
+    db_path = tmp_path / "datasets.db"
+    dataset = DatasetManage(db_path=str(db_path))
+    dataset.create()
+    urls = json.dumps(json.dumps({"lanzou": "http://example.com/x"}))
+    dataset.execute(
+        "insert into datasets (name, category, path, urls) values "
+        "('demo', 'cat', 'demo.bin', '{}')".format(urls)
+    )
+
+    with pytest.raises(NotImplementedError):
+        dataset.download("demo")
+    dataset.close()
 
 
 def test_import_dataset_submodule_requires_unavailable_deps():
-    """fundata.dataset (core.py / datas.py / images.py) imports `from
-    notedata.manage import DatasetManage` -- an OLD package name -- instead
-    of the local `fundata.manage`, plus tensorflow / notekeras / demjson /
-    scikit-learn.
-
-    - `notedata` is still separately published on PyPI, but its own
-      metadata declares a hard dependency on the nonexistent `notetool`,
-      so `notedata` itself can never be installed.
-    - `demjson` (needed directly by `dataset/datas.py`) fails to build on
-      modern setuptools/Python.
-    - tensorflow is a very heavy dependency that would only serve to
-      reach code that is already blocked by the two points above.
-
-    This looks like the same incomplete "notedata -> fundata" rename
-    referenced in the tracking issue: `fundata`'s own dataset submodule
-    never got its internal import updated from `notedata.manage` to the
-    local `fundata.manage`. Confirmed further by `example/run.py` and
-    `example/dataset.py` in this repo, which still import `notedata`
-    directly. Not fixed here (source refactor, out of scope for this
-    test-only change); reported as a finding instead of faking a pass.
+    """fundata.dataset (core.py / datas.py / images.py) no longer imports the
+    dead `notedata` name (fixed in #154 -- now a local `fundata.manage`
+    self-import), but `dataset/datas.py` separately imports tensorflow /
+    notekeras / demjson / scikit-learn directly, none of which are declared
+    dependencies or installed here. This is an unrelated, pre-existing
+    problem (missing heavy ML deps), not a note*->fun* naming issue, so it's
+    out of scope for #154. Reported as a finding instead of faking a pass.
     """
     pytest.skip(
-        "需要真实凭据/网络，跳过：fundata.dataset 内部仍从旧包名 notedata 导入 "
-        "(`from notedata.manage import DatasetManage`)，而不是本地的 fundata.manage，"
-        "疑似 notedata -> fundata 改名未完全同步的遗留问题（example/run.py、example/dataset.py "
-        "中同样直接 import notedata，可佐证）；同时 notedata 自身在 PyPI 上声明依赖已不存在的 "
-        "notetool 而无法安装，demjson 在现代环境下构建失败，tensorflow 体积过大且无法绕开上述阻塞，"
-        "已作为发现问题记录，未修复源码。"
+        "notedata/notetool/notedrive 引用已在 #154 修复（改为本地 fundata.manage 自引用 / "
+        "funshell / funutil / fundata._util），但 fundata.dataset 内部 "
+        "dataset/datas.py 仍直接 import demjson / tensorflow / notekeras / scikit-learn，"
+        "这几个都不是本仓库声明的依赖，也未安装，属于与 note*->fun* 改名无关的另一类遗留问题"
+        "（缺失/已废弃的重型 ML 依赖），不在 #154 范围内，已作为新发现记录，未修复。"
     )

@@ -6,13 +6,15 @@ import demjson
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from notedata.manage import DatasetManage
+from funutil import getLogger
 from notekeras.features.feature_parse import define_feature_json
-from notetool.tool import exists_file, log
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
-logger = log(__name__)
+from .._util import exists_file
+from ..manage import DatasetManage
+
+logger = getLogger(__name__)
 
 
 class DataSet:

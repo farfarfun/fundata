@@ -1,8 +1,7 @@
 import json
 import os
 
-from notedrive.lanzou import download as download_lanzou
-from notetool.database import SqliteTable
+from ..tables_bak.core import SqliteTable
 
 
 class DatasetManage(SqliteTable):
@@ -60,7 +59,13 @@ class DatasetManage(SqliteTable):
             path = path_root + path
 
             if "lanzou" in line["urls"].keys():
-                download_lanzou(line["urls"]["lanzou"], dir_pwd=os.path.dirname(path))
+                # notedrive.lanzou.download(url, dir_pwd=...) no longer exists;
+                # fundrive's replacement (LanZouDrive.download_file) needs an
+                # authenticated drive instance, not a drop-in free function.
+                raise NotImplementedError(
+                    "lanzou download is not wired up to fundrive's "
+                    "LanZouDrive yet -- see farfarfun/todo-list#154"
+                )
 
         return True
 

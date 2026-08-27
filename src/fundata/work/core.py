@@ -1,6 +1,6 @@
 import os
 
-from notetool.tool.path import exist_and_create
+from .._util import exist_and_create
 
 
 class WorkApp:

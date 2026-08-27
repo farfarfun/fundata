@@ -5,8 +5,8 @@ from time import strftime
 from typing import List
 
 import pandas as pd
-from notebuild.shell import run_shell
-from notetool.tool import log
+from funshell import run_shell
+from funutil import getLogger
 
 
 class BaseTable:
@@ -22,7 +22,7 @@ class BaseTable:
         """
         self.table_name = table_name
         self.columns = columns
-        self.logger = log(table_name)
+        self.logger = getLogger(table_name)
 
     def execute(self, sql, *args, **kwargs):
         """

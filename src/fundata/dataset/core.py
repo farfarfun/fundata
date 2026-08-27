@@ -1,9 +1,10 @@
 import pandas as pd
-from .datas import ElectronicsData
-from notedata.manage import DatasetManage
-from notetool.tool import log
+from funutil import getLogger
 
-logger = log(__name__)
+from .datas import ElectronicsData
+from ..manage import DatasetManage
+
+logger = getLogger(__name__)
 
 
 def get_electronics(dataset: DatasetManage = None):

@@ -2,9 +2,7 @@ import json
 
 import pandas as pd
 
-from notedata.manage.core import download
-from notetool.tool import decompress
-from notetool.tool.path import rename, path_parse
+from fundata._util import path_parse
 
 pd.set_option("display.max_columns", None)
 pd.set_option("display.max_rows", 200)
@@ -12,15 +10,9 @@ pd.set_option("max_colwidth", 500)
 
 
 def dataset_coco(data_root="./download/coco/"):
-    def step1():
-        download("coco-annotations_trainval2017", path=data_root)
-        download("coco-val2017", path=data_root)
-
-        decompress(data_root + "annotations_trainval2017.zip", target_dir=data_root)
-        decompress(data_root + "val2017.zip", target_dir=data_root)
-
-        rename(data_root + "val2017", data_root + "images")
-
+    # step1 (download+decompress raw COCO archives) relied on the defunct
+    # notedata/notetool download+decompress helpers and was already disabled
+    # (never called) before this fix; removed rather than reimplemented.
     def step2(json_path, target_file):
         json_data = json.load(open(json_path))
         df_annotations = pd.DataFrame.from_dict(json_data["annotations"])
