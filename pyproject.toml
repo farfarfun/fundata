@@ -3,7 +3,7 @@ name = "fundata"
 version = "1.0.2"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.10"
 dependencies = [
     "pandas",
     "funshell>=1.0.0",
