@@ -1,7 +1,7 @@
 import pickle
 import random
 
-from notedata.manage import DatasetManage
+from fundata.manage import DatasetManage
 
 dataset = DatasetManage()
 random.seed(1234)

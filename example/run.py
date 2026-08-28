@@ -1,6 +1,6 @@
 import os
 
-from notedata.manage import DatasetManage, insert_library
+from fundata.manage import DatasetManage, insert_library
 
 
 def run1():
@@ -10,7 +10,7 @@ def run1():
 def run2():
     data = DatasetManage()
     cmd = "cp -r {} {}".format(
-        data.db_path, os.path.abspath("./../notedata/manage/dataset.db")
+        data.db_path, os.path.abspath("./../fundata/manage/dataset.db")
     )
     print(cmd)
     os.system(cmd)

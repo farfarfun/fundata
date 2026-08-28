@@ -1,4 +1,4 @@
-from notedata.dataset import CriteoData, ElectronicsData
+from fundata.dataset import CriteoData, ElectronicsData
 
 electronic = ElectronicsData()
 # electronic.download()
@@ -17,11 +17,11 @@ print(criteo.build_dataset())
 
 """
 cd ..
-notebuild build
+funbuild build
 cd example
 
-pip install git+https://gitee.com/notechats/notedata.git
+pip install fundata
 
-/root/anaconda3/bin/python /root/workspace/notechats/notedata/example/dataset.py
+/root/anaconda3/bin/python /root/workspace/farfarfun/fundata/example/dataset.py
 
 """

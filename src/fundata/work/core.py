@@ -4,8 +4,8 @@ from .._util import exist_and_create
 
 
 class WorkApp:
-    def __init__(self, app_name="notedata", dir_app=None):
-        self.dir_app = dir_app or f"/opt/notechats/apps/{app_name}"
+    def __init__(self, app_name="fundata", dir_app=None):
+        self.dir_app = dir_app or f"/opt/farfarfun/apps/{app_name}"
 
         self.dir_db = os.path.join(self.dir_app, "databases")
         self.dir_log = os.path.join(self.dir_app, "logs")
@@ -27,9 +27,9 @@ class WorkApp:
         return os.path.join(self.dir_common, file_name)
 
 
-def db_file(app_name="notedata", file_name="data.db"):
+def db_file(app_name="fundata", file_name="data.db"):
     return WorkApp(app_name=app_name).db_file(file_name)
 
 
-def log_file(app_name="notedata", file_name="data.db"):
+def log_file(app_name="fundata", file_name="data.db"):
     return WorkApp(app_name=app_name).log_file(file_name)
