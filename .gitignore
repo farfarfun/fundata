@@ -1,6 +1,6 @@
 build/*
 dist/*
-notedata.egg-info/*
+fundata.egg-info/*
 example/download/*
 */__pycache__
 *.pyc

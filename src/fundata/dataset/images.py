@@ -10,9 +10,9 @@ pd.set_option("max_colwidth", 500)
 
 
 def dataset_coco(data_root="./download/coco/"):
-    # step1 (download+decompress raw COCO archives) relied on the defunct
-    # notedata/notetool download+decompress helpers and was already disabled
-    # (never called) before this fix; removed rather than reimplemented.
+    # step1 (download+decompress raw COCO archives) relied on download+decompress
+    # helpers that no longer exist and was already disabled (never called)
+    # before this fix; removed rather than reimplemented.
     def step2(json_path, target_file):
         json_data = json.load(open(json_path))
         df_annotations = pd.DataFrame.from_dict(json_data["annotations"])

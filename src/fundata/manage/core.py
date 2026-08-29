@@ -59,12 +59,12 @@ class DatasetManage(SqliteTable):
             path = path_root + path
 
             if "lanzou" in line["urls"].keys():
-                # notedrive.lanzou.download(url, dir_pwd=...) no longer exists;
-                # fundrive's replacement (LanZouDrive.download_file) needs an
+                # There is no free-function download(url, dir_pwd=...) helper
+                # anymore; fundrive's LanZouDrive.download_file needs an
                 # authenticated drive instance, not a drop-in free function.
                 raise NotImplementedError(
                     "lanzou download is not wired up to fundrive's "
-                    "LanZouDrive yet -- see farfarfun/todo-list#154"
+                    "LanZouDrive yet"
                 )
 
         return True

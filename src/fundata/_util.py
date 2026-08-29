@@ -1,8 +1,8 @@
-"""Small file-path helpers that used to live in the now-defunct ``notetool``
-package. ``notetool`` was renamed to ``funtool`` (PyPI: ``farfuntool``), but
-``funtool.tool`` itself still imports the dead ``notetool`` name (a separate,
-unfixed bug), so it cannot be depended on here. These are minimal local
-reimplementations of just the functions fundata actually needs.
+"""Small file-path helpers reimplemented locally because ``funtool.tool``
+(PyPI: ``farfuntool``) has an unrelated import bug -- it imports a module
+that doesn't exist in the published package -- so it cannot be depended on
+here. These are minimal local reimplementations of just the functions
+fundata actually needs.
 """
 
 import os

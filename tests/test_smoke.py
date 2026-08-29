@@ -2,24 +2,21 @@
 
 Background / import-path notes
 -------------------------------
-The published distribution name and the importable top-level package
-both use the *current* name: ``import fundata`` (NOT the legacy
-``notedata`` name).
+``fundata.work``, ``fundata.manage`` and ``fundata.tables_bak`` import
+cleanly with only the declared dependencies (``pandas``, ``funshell``,
+``funutil``, ``tqdm``): they use a local ``fundata._util`` helper for
+small file-path utilities, and (for ``manage.core.DatasetManage.download``'s
+lanzou branch, which has no drop-in replacement in the current
+``fundrive`` API) raise ``NotImplementedError`` instead of failing at
+import time.
 
-As of farfarfun/todo-list#154, ``fundata.work``, ``fundata.manage`` and
-``fundata.tables_bak`` no longer reach for the dead ``notetool`` /
-``notedrive`` package names -- they now use a local ``fundata._util``
-helper, a real current dependency (``funshell``, ``funutil``), or (for
-``manage.core.DatasetManage.download``'s lanzou branch, which had no
-drop-in replacement in the current ``fundrive`` API) raise
-``NotImplementedError`` instead of failing at import time.
-
-``fundata.dataset`` is a separate, still-unresolved case: on top of the
-now-fixed ``notedata.manage`` self-import, ``dataset/datas.py`` also
+``fundata.dataset`` is a separate, still-unresolved case: ``dataset/datas.py``
 imports ``demjson`` / ``tensorflow`` / ``notekeras`` directly, none of
-which are declared dependencies or installed here. That's a distinct,
-pre-existing problem (missing/dead heavy ML deps) unrelated to the
-note*->fun* renames #154 covers, so ``fundata.dataset`` still cannot be
+which are declared dependencies or installed here. (``notekeras`` is
+intentional, not a leftover: the published ``funkeras`` PyPI package
+still ships its code under the top-level importable name ``notekeras``,
+so that import must stay as-is.) This is a distinct, pre-existing problem
+(missing/dead heavy ML deps), so ``fundata.dataset`` still cannot be
 imported -- documented and skipped below rather than faked as passing.
 """
 
@@ -42,8 +39,7 @@ def test_import_paths_submodule():
 
 def test_work_app_smoke():
     """fundata.work.WorkApp: construct + path helpers, real filesystem
-    creation via fundata._util.exist_and_create (no more notetool stub
-    needed post-#154)."""
+    creation via fundata._util.exist_and_create."""
     import fundata.work as work
 
     app = work.WorkApp(app_name="smoke-test-app", dir_app="/tmp/fundata-smoke-app")
@@ -154,11 +150,10 @@ def test_tables_bak_delete_condition_bug(tmp_path):
 
 
 def test_manage_dataset_manage_smoke(tmp_path):
-    """fundata.manage.DatasetManage now imports cleanly post-#154 (subclasses
-    the local fundata.tables_bak.core.SqliteTable instead of the dead
-    notetool.database.SqliteTable). Exercise real CRUD against a throwaway
-    sqlite db; the lanzou-download branch still can't be smoke tested
-    (needs real credentials/network) so it's left untouched here."""
+    """fundata.manage.DatasetManage imports cleanly (subclasses the local
+    fundata.tables_bak.core.SqliteTable). Exercise real CRUD against a
+    throwaway sqlite db; the lanzou-download branch still can't be smoke
+    tested (needs real credentials/network) so it's left untouched here."""
     from fundata.manage.core import DatasetManage
 
     db_path = tmp_path / "datasets.db"
@@ -176,10 +171,10 @@ def test_manage_dataset_manage_smoke(tmp_path):
 
 def test_manage_lanzou_download_not_implemented(tmp_path):
     """The lanzou branch of DatasetManage.download() has no drop-in
-    replacement for the removed notedrive.lanzou.download free function
-    (current fundrive.drives.lanzou.LanZouDrive is class-based and needs
-    an authenticated instance) -- it now raises NotImplementedError
-    instead of ImportError-ing the whole module. See #154.
+    replacement for a free-function-style download() helper (current
+    fundrive.drives.lanzou.LanZouDrive is class-based and needs an
+    authenticated instance) -- it raises NotImplementedError instead of
+    ImportError-ing the whole module.
 
     Note: DatasetManage.decode() does `json.loads(json.loads(urls))` --
     i.e. it expects `urls` to be *double* JSON-encoded -- while
@@ -208,18 +203,14 @@ def test_manage_lanzou_download_not_implemented(tmp_path):
 
 
 def test_import_dataset_submodule_requires_unavailable_deps():
-    """fundata.dataset (core.py / datas.py / images.py) no longer imports the
-    dead `notedata` name (fixed in #154 -- now a local `fundata.manage`
-    self-import), but `dataset/datas.py` separately imports tensorflow /
+    """fundata.dataset (core.py / datas.py / images.py) imports `fundata.manage`
+    locally, but `dataset/datas.py` separately imports tensorflow /
     notekeras / demjson / scikit-learn directly, none of which are declared
-    dependencies or installed here. This is an unrelated, pre-existing
-    problem (missing heavy ML deps), not a note*->fun* naming issue, so it's
-    out of scope for #154. Reported as a finding instead of faking a pass.
+    dependencies or installed here. This is a pre-existing problem (missing
+    heavy ML deps), reported as a finding instead of faking a pass.
     """
     pytest.skip(
-        "notedata/notetool/notedrive 引用已在 #154 修复（改为本地 fundata.manage 自引用 / "
-        "funshell / funutil / fundata._util），但 fundata.dataset 内部 "
-        "dataset/datas.py 仍直接 import demjson / tensorflow / notekeras / scikit-learn，"
-        "这几个都不是本仓库声明的依赖，也未安装，属于与 note*->fun* 改名无关的另一类遗留问题"
-        "（缺失/已废弃的重型 ML 依赖），不在 #154 范围内，已作为新发现记录，未修复。"
+        "fundata.dataset 内部 dataset/datas.py 直接 import demjson / tensorflow / "
+        "notekeras / scikit-learn，这几个都不是本仓库声明的依赖，也未安装，属于缺失/"
+        "已废弃的重型 ML 依赖，已作为已知问题记录，未修复。"
     )
