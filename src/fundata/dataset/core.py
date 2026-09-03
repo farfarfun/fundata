@@ -1,5 +1,5 @@
 import pandas as pd
-from funutil import getLogger
+from farlog import getLogger
 
 from .datas import ElectronicsData
 from ..manage import DatasetManage
@@ -25,7 +25,7 @@ def get_adult_data(dataset: DatasetManage = None):
     data_train = dataset.download("adult-train", overwrite=False)
     data_test = dataset.download("adult-test", overwrite=False)
 
-    print(data_test)
+    logger.info(f"adult-test 数据: {data_test}")
     train_data = pd.read_table(data_train.path, header=None, delimiter=",")
     test_data = pd.read_table(
         data_test.path, header=None, delimiter=",", error_bad_lines=False

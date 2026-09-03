@@ -6,7 +6,7 @@ import demjson
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from funutil import getLogger
+from farlog import getLogger
 from notekeras.features.feature_parse import define_feature_json
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler

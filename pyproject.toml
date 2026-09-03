@@ -4,11 +4,29 @@ version = "1.0.2"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
-    "pandas",
-    "funshell>=1.0.0",
-    "funutil>=1.0.14",
-    "tqdm",
+    "pandas>=2.0",
+    "funshell>=1.0.22",
+    "farlog>=1.1.7",
+    "tqdm>=4.60",
+]
+
+[project.optional-dependencies]
+# fundata.dataset 下的具体数据集处理类（ElectronicsData/CriteoData 等）依赖的重型 ML 库，
+# 主依赖不默认安装，按需通过 `pip install fundata[dataset]` 引入。
+#
+# 注意：dataset/datas.py 中还直接 `import demjson`，但 PyPI 上的 demjson==2.2.4
+# 是唯一版本，其 setup.py 使用了 setuptools>=58 已移除的 use_2to3 参数，在任何现代
+# 工具链下都无法构建（不是本次审计能力范围内可修的元数据问题，是上游包本身已废弃、
+# 只支持 Python 2）。声明成 extra 会导致 `uv lock`/`pip install fundata[dataset]`
+# 直接失败，因此这里不把它列进 extras；README 中已注明这一限制，需要用到
+# ElectronicsData/CriteoData 时需自行处理 demjson 的替代或安装方式。
+dataset = [
+    "tensorflow>=2.15",
+    "scikit-learn>=1.3",
+    "funkeras>=0.8",
 ]
 
 [dependency-groups]

@@ -1,7 +1,11 @@
 import json
 import os
 
+from farlog import getLogger
+
 from ..tables_bak.core import SqliteTable
+
+logger = getLogger(__name__)
 
 
 class DatasetManage(SqliteTable):
@@ -50,7 +54,7 @@ class DatasetManage(SqliteTable):
         )
 
         if len(res) == 0:
-            print("No this dataset")
+            logger.warning(f"数据集不存在: name={name}")
             return False
 
         for line in res.to_dict(orient="records"):

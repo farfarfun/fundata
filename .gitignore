@@ -3,11 +3,28 @@ dist/*
 fundata.egg-info/*
 example/download/*
 */__pycache__
+__pycache__/
 *.pyc
 
 # 数据目录索引缓存：内容与 manage/library.py 的 insert_library() 完全一致，
 # 通过 `from fundata.manage import insert_library; insert_library()` 即可重建
 src/fundata/manage/dataset.db
+
+# ---- farfarfun 组织约定 (SPEC §10) ----
+# 本地数据库、运行时文件、虚拟环境、IDE 文件
+*.db
+*.sqlite
+*.sqlite3
+*.rar
+.venv/
+.run/
+logs/
+*.log
+.idea/
+.vscode/
+.pytest_cache/
+.ruff_cache/
+node_modules/
 
 # ---- AI 编码助手 ----
 # 只忽略本地状态；团队有意共享的 agent / 命令 / 规则定义仍然版本化。

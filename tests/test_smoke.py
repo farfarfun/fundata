@@ -4,20 +4,21 @@ Background / import-path notes
 -------------------------------
 ``fundata.work``, ``fundata.manage`` and ``fundata.tables_bak`` import
 cleanly with only the declared dependencies (``pandas``, ``funshell``,
-``funutil``, ``tqdm``): they use a local ``fundata._util`` helper for
+``farlog``, ``tqdm``): they use a local ``fundata._util`` helper for
 small file-path utilities, and (for ``manage.core.DatasetManage.download``'s
 lanzou branch, which has no drop-in replacement in the current
 ``fundrive`` API) raise ``NotImplementedError`` instead of failing at
 import time.
 
 ``fundata.dataset`` is a separate, still-unresolved case: ``dataset/datas.py``
-imports ``demjson`` / ``tensorflow`` / ``notekeras`` directly, none of
-which are declared dependencies or installed here. (``notekeras`` is
+imports ``demjson`` / ``tensorflow`` / ``notekeras`` / ``scikit-learn``
+directly. These are now declared under the ``dataset`` extra
+(``pip install fundata[dataset]``) rather than the default dependencies,
+but are not installed in this test environment. (``notekeras`` is
 intentional, not a leftover: the published ``funkeras`` PyPI package
 still ships its code under the top-level importable name ``notekeras``,
-so that import must stay as-is.) This is a distinct, pre-existing problem
-(missing/dead heavy ML deps), so ``fundata.dataset`` still cannot be
-imported -- documented and skipped below rather than faked as passing.
+so that import must stay as-is.) So ``fundata.dataset`` still cannot be
+imported here -- documented and skipped below rather than faked as passing.
 """
 
 import logging
@@ -205,12 +206,14 @@ def test_manage_lanzou_download_not_implemented(tmp_path):
 def test_import_dataset_submodule_requires_unavailable_deps():
     """fundata.dataset (core.py / datas.py / images.py) imports `fundata.manage`
     locally, but `dataset/datas.py` separately imports tensorflow /
-    notekeras / demjson / scikit-learn directly, none of which are declared
-    dependencies or installed here. This is a pre-existing problem (missing
-    heavy ML deps), reported as a finding instead of faking a pass.
+    notekeras / demjson / scikit-learn directly. These are declared under
+    the `dataset` extra (`pip install fundata[dataset]`) but are not
+    installed in this test environment, so the submodule still can't be
+    imported here.
     """
     pytest.skip(
         "fundata.dataset 内部 dataset/datas.py 直接 import demjson / tensorflow / "
-        "notekeras / scikit-learn，这几个都不是本仓库声明的依赖，也未安装，属于缺失/"
-        "已废弃的重型 ML 依赖，已作为已知问题记录，未修复。"
+        "notekeras / scikit-learn，均已收录进 pyproject.toml 的 `dataset` extra"
+        "（pip install fundata[dataset]），但测试环境未安装这组重型 ML 依赖，"
+        "因此该子模块仍无法在此处导入，跳过而非伪造通过。"
     )

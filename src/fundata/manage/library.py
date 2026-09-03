@@ -1,18 +1,22 @@
 import json
 
+from farlog import getLogger
 from tqdm import tqdm
 
 from .core import DatasetManage
 
+logger = getLogger(__name__)
+
 
 def check():
+    """校验库内第一条记录的 urls 字段能否正常解码，用于调试。"""
     dataset = DatasetManage()
     dataset.create()
 
     data = dataset.select_all()
     d1 = json.loads(json.loads(data[0][3]))
-    print(d1)
-    print(d1["source"])
+    logger.info(f"urls={d1}")
+    logger.info(f"source={d1['source']}")
 
 
 def insert_library():

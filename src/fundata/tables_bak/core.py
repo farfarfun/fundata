@@ -2,11 +2,13 @@ import os
 import sqlite3
 import time
 from time import strftime
-from typing import List
+from typing import Any
 
 import pandas as pd
+from farlog import getLogger
 from funshell import run_shell
-from funutil import getLogger
+
+from ..exceptions import TableConfigError, TableQueryError
 
 
 class BaseTable:
@@ -14,7 +16,9 @@ class BaseTable:
     表维度的底层数据库的通用实现
     """
 
-    def __init__(self, table_name: str = "default_table", columns: List[str] = None):
+    def __init__(
+        self, table_name: str = "default_table", columns: list[str] | None = None
+    ) -> None:
         """
         初始化一个通用数据库
         :param table_name: 表名
@@ -24,15 +28,17 @@ class BaseTable:
         self.columns = columns
         self.logger = getLogger(table_name)
 
-    def execute(self, sql, *args, **kwargs):
+    def execute(self, sql: str, *args: Any, **kwargs: Any) -> Any:
         """
-        执行sql的引擎
+        执行sql的引擎，需子类实现
         :param sql: sql
         :return: 执行的返回结果
         """
-        raise Exception("还没有实现")
+        raise NotImplementedError(
+            f"{type(self).__name__}.execute() 未实现，需在子类（如 SqliteTable）中重写"
+        )
 
-    def insert(self, properties: dict):
+    def insert(self, properties: dict) -> Any:
         """
         插入单条记录，当表设置唯一键插入时，如果唯一键已存在，则返回
         :param properties: 记录以字典形式保存，key是字段名，value是字段值
@@ -46,7 +52,7 @@ class BaseTable:
         )
         return self.execute(sql)
 
-    def update(self, properties: dict, condition: dict):
+    def update(self, properties: dict, condition: dict) -> Any:
         """
         更新数据
         :param properties: 需要更新的字段
@@ -61,7 +67,7 @@ class BaseTable:
         )
         return self.execute(sql)
 
-    def update_or_insert(self, properties: dict, condition: dict = None):
+    def update_or_insert(self, properties: dict, condition: dict | None = None) -> Any:
         """
         更新或者插入，首先尝试更新，更新失败则插入
         :param properties: 需要更新的字段
@@ -74,7 +80,7 @@ class BaseTable:
         else:
             return up
 
-    def decode(self, properties: dict):
+    def decode(self, properties: dict) -> dict:
         """
         需要子类实现
         有些数据插入时可能需要编码/加密等特殊操作，同时，取数据后需要有对应的解码/解密操作，默认不编码/加密
@@ -83,7 +89,7 @@ class BaseTable:
         """
         return properties
 
-    def encode(self, properties: dict):
+    def encode(self, properties: dict) -> dict:
         """
         需要子类实现
         有些数据插入时可能需要编码/加密等特殊操作，同时，取数据后需要有对应的解码/解密操作，默认不解码/解密
@@ -92,7 +98,7 @@ class BaseTable:
         """
         return properties
 
-    def count(self, properties: dict):
+    def count(self, properties: dict | None) -> int:
         """
         满足条件的数据量
         :param properties: 记录数
@@ -114,13 +120,13 @@ class BaseTable:
             return row[0]
         return 0
 
-    def select_all(self):
+    def select_all(self) -> list[dict]:
         """
         返回全表数据
         """
         return self.select("select * from table_name")
 
-    def select(self, sql=None, condition: dict = None):
+    def select(self, sql: str | None = None, condition: dict | None = None) -> list[dict]:
         """
         根据sql或者指定条件选择数据
         :param sql: sql
@@ -138,14 +144,16 @@ class BaseTable:
         rows = self.execute(sql)
         return [] if rows is None else [dict(zip(self.columns, row)) for row in rows]
 
-    def _properties2kv(self, properties: dict):
+    def _properties2kv(self, properties: dict) -> tuple[list[str], list[str]]:
         """
         将输入的记录数据转换成表的字段名和字段值数据
         :param properties: 记录数据
         :return: keys and values
         """
         if self.columns is None:
-            raise Exception("origin_keys cannot be None")
+            raise TableConfigError(
+                f"表 {self.table_name} 未设置 columns，无法转换记录字段"
+            )
         keys = []
         values = []
         for key in self.columns:
@@ -155,7 +163,7 @@ class BaseTable:
                 values.append("'{}'".format(value))
         return keys, values
 
-    def _condition2equal(self, properties: dict):
+    def _condition2equal(self, properties: dict | str) -> list[str] | str:
         """
         将输入的记录数据转换成表的字段名和字段值数据的等式
         :param properties: 记录数据
@@ -164,7 +172,9 @@ class BaseTable:
         if isinstance(properties, str):
             return properties
         if self.columns is None:
-            raise Exception("origin_keys cannot be None")
+            raise TableConfigError(
+                f"表 {self.table_name} 未设置 columns，无法构造 where 条件"
+            )
         equals = []
         for key in self.columns:
             value = properties.get(key, None)
@@ -175,7 +185,7 @@ class BaseTable:
                     equals.append("{}={}".format(key, value))
         return equals
 
-    def sql_format(self, sql):
+    def sql_format(self, sql: str) -> str:
         """
         对sql进行格式化，如一些特定字符串的替换
         :param sql: sql
@@ -184,7 +194,7 @@ class BaseTable:
         sql = sql.replace("table_name", self.table_name)
         return sql
 
-    def delete(self, condition=None):
+    def delete(self, condition: dict | str | None = None) -> None:
         """
         删除表
         :param condition:
@@ -206,7 +216,14 @@ class BaseTable:
 
 
 class SqliteTable(BaseTable):
-    def __init__(self, db_path, conn=None, *args, **kwargs):
+    def __init__(
+        self, db_path: str, conn: sqlite3.Connection | None = None, *args: Any, **kwargs: Any
+    ) -> None:
+        """
+        基于 sqlite3 的表实现。
+        :param db_path: 数据库文件路径
+        :param conn: 已建立的连接，不传则按 db_path 新建
+        """
         super(SqliteTable, self).__init__(*args, **kwargs)
         self.db_path = db_path
         if not os.path.exists(os.path.dirname(self.db_path)):
@@ -215,30 +232,37 @@ class SqliteTable(BaseTable):
         self.cursor = self.conn.cursor()
         self.logger.info("db path:{}".format(self.db_path))
 
-    def execute(self, sql, commit=True, *args, **kwargs):
+    def execute(self, sql: str, commit: bool = True, *args: Any, **kwargs: Any) -> sqlite3.Cursor:
         """
         sql执行核心
         :param commit: 是否需要commit
         :param sql: 执行sql
         :return: 执行结果
+        :raises TableQueryError: sql 执行失败时抛出，带上下文信息，不再静默吞掉
         """
         try:
             rows = self.cursor.execute(sql)
             if commit:
                 self.conn.commit()
             return rows
-        except Exception as e:
-            print("{}  with error:{}".format(sql, e))
-            return
+        except sqlite3.Error as e:
+            self.logger.error(
+                "执行 SQL 失败: table={} db_path={} sql={} error={}".format(
+                    self.table_name, self.db_path, sql, e
+                )
+            )
+            raise TableQueryError(
+                f"表 {self.table_name} 执行 SQL 失败: {e}"
+            ) from e
 
-    def close(self):
+    def close(self) -> None:
         """
         关闭数据库连接
         """
         self.cursor.close()
         self.conn.close()
 
-    def select_pd(self, sql="select * from table_name"):
+    def select_pd(self, sql: str = "select * from table_name") -> pd.DataFrame:
         """
         将表数据转成pandas的DataFrame
         :param sql: sql
@@ -247,7 +271,11 @@ class SqliteTable(BaseTable):
         sql = self.sql_format(sql)
         return pd.read_sql(sql, self.conn)
 
-    def save_and_truncate(self):
+    def save_and_truncate(self) -> pd.DataFrame:
+        """
+        将全表数据导出为 csv 后清空表，并执行 VACUUM 回收空间。
+        :return: 导出前的全表数据
+        """
         result = pd.read_sql("select * from {}".format(self.table_name), self.conn)
 
         count = len(result)
@@ -265,7 +293,21 @@ class SqliteTable(BaseTable):
         self.vacuum()
         return result
 
-    def to_csv(self, condition, path=None, pop=False, *args, **kwargs):
+    def to_csv(
+        self,
+        condition: str | dict | None,
+        path: str | None = None,
+        pop: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """
+        将满足条件的数据导出为 csv。
+        :param condition: where 条件
+        :param path: 导出文件路径，不传则按表名和时间戳生成
+        :param pop: 导出后是否删除并 VACUUM
+        :return: 导出文件路径
+        """
         if condition is None:
             sql = "select * from {}".format(self.table_name)
         else:
@@ -289,21 +331,27 @@ class SqliteTable(BaseTable):
             self.vacuum()
         return path
 
-    def pop_to_csv(self, condition, path=None):
+    def pop_to_csv(self, condition: str | dict | None, path: str | None = None) -> str:
+        """
+        导出满足条件的数据为 csv，并从表中删除这些数据。
+        :param condition: where 条件
+        :param path: 导出文件路径
+        :return: 导出文件路径
+        """
         return self.to_csv(condition, path=path, pop=True)
 
-    def vacuum(self):
+    def vacuum(self) -> None:
         """
         数据库清理
         """
         self.execute("VACUUM")
         self.logger.info("数据库VACUUM")
 
-    def insert_list(self, property_list: List[dict]):
+    def insert_list(self, property_list: list[dict]) -> bool:
         """
         批量插入
-        :param property_list:
-        :return:
+        :param property_list: 待插入的记录列表
+        :return: 是否成功
         """
         values = [
             tuple([properties.get(key, "") for key in self.columns])
