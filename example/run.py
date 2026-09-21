@@ -1,6 +1,10 @@
 import os
 
+from farlog import getLogger
+from funshell import run_shell_list
 from fundata.manage import DatasetManage, insert_library
+
+logger = getLogger(__name__)
 
 
 def run1():
@@ -12,8 +16,10 @@ def run2():
     cmd = "cp -r {} {}".format(
         data.db_path, os.path.abspath("./../fundata/manage/dataset.db")
     )
-    print(cmd)
-    os.system(cmd)
+    logger.info(cmd)
+    run_shell_list(
+        ["cp", "-r", data.db_path, os.path.abspath("./../fundata/manage/dataset.db")]
+    )
     sources = data.select_pd()
 
     lines = ["|序号|分类|名称|描述|官网下载|蓝奏下载|", "|:-:|:-:|:-:|:-:|:-:|:-:|"]

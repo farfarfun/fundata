@@ -1,15 +1,13 @@
+import ast
+import json
 import os
 import pickle
 import random
 
-import demjson
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from farlog import getLogger
-from notekeras.features.feature_parse import define_feature_json
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from funshell import run_shell_list
 
 from .._util import exists_file
 from ..manage import DatasetManage
@@ -18,29 +16,33 @@ logger = getLogger(__name__)
 
 
 class DataSet:
-    """ """
+    """数据集处理基类。"""
 
-    def __init__(self, dataset: DatasetManage = None, data_path="./download/"):
-        """ """
+    def __init__(
+        self, dataset: DatasetManage | None = None, data_path: str = "./download/"
+    ) -> None:
+        """初始化数据集处理器。"""
         # 源文件保存目录
         self.dataset = dataset or DatasetManage()
         self.path_root = data_path
 
-    def download(self, mode=1):
-        """ """
-        pass
+    def download(self, mode: int = 1) -> None:
+        """下载原始数据，具体数据集由子类实现。"""
+        raise NotImplementedError
 
-    def preprocess(self, step=0):
-        """ """
-        pass
+    def preprocess(self, step: int = 0) -> None:
+        """预处理数据，具体数据集由子类实现。"""
+        raise NotImplementedError
 
-    def build_dataset(self):
-        """ """
-        pass
+    def build_dataset(self) -> object:
+        """构建训练数据，具体数据集由子类实现。"""
+        raise NotImplementedError
 
 
 class ElectronicsData(DataSet):
-    def __init__(self, *args, **kwargs):
+    """Amazon Electronics 数据集处理器。"""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(ElectronicsData, self).__init__(*args, **kwargs)
 
         # 源文件
@@ -66,17 +68,17 @@ class ElectronicsData(DataSet):
         logger.info("download done")
         logger.info("begin unzip file")
 
-        os.system(
-            "cd "
-            + self.path_root
-            + "/electronics && gzip -d reviews_Electronics_5.json.gz"
+        run_shell_list(
+            ["gzip", "-d", "reviews_Electronics_5.json.gz"],
+            cwd=os.path.join(self.path_root, "electronics"),
         )
-        os.system(
-            "cd " + self.path_root + "/electronics && gzip -d meta_Electronics.json.gz"
+        run_shell_list(
+            ["gzip", "-d", "meta_Electronics.json.gz"],
+            cwd=os.path.join(self.path_root, "electronics"),
         )
         logger.info("unzip done")
 
-    def convert_pd_1(self, overwrite=False):
+    def convert_pd_1(self, overwrite: bool = False) -> None:
         if exists_file(self.pkl_reviews, mkdir=True) and exists_file(
             self.pkl_meta, mkdir=True
         ):
@@ -87,7 +89,7 @@ class ElectronicsData(DataSet):
                 df = {}
                 i = 0
                 for line in fin:
-                    df[i] = eval(line)
+                    df[i] = ast.literal_eval(line)
                     i += 1
                 df = pd.DataFrame.from_dict(df, orient="index")
                 return df
@@ -102,7 +104,7 @@ class ElectronicsData(DataSet):
         with open(self.pkl_meta, "wb") as f:
             pickle.dump(meta_df, f, pickle.HIGHEST_PROTOCOL)
 
-    def remap_id_2(self, overwrite=False):
+    def remap_id_2(self, overwrite: bool = False) -> None:
         random.seed(1234)
         if exists_file(self.pkl_remap, mkdir=True):
             return
@@ -183,7 +185,7 @@ class ElectronicsData(DataSet):
             )
             pickle.dump((asin_key, cate_key, view_key), f, pickle.HIGHEST_PROTOCOL)
 
-    def build_dataset_3(self, overwrite=False):
+    def build_dataset_3(self, overwrite: bool = False) -> None:
         random.seed(1234)
         if exists_file(self.pkl_dataset, mkdir=True):
             return
@@ -244,7 +246,7 @@ class ElectronicsData(DataSet):
                 (user_count, item_count, cate_count, max_sl), f, pickle.HIGHEST_PROTOCOL
             )
 
-    def init_data(self, overwrite=False):
+    def init_data(self, overwrite: bool = False) -> None:
         self.download_raw_0(overwrite=overwrite)
 
         self.convert_pd_1(overwrite=overwrite)
@@ -253,10 +255,10 @@ class ElectronicsData(DataSet):
 
         self.build_dataset_3(overwrite=overwrite)
 
-    def download(self, mode=1):
+    def download(self, mode: int = 1) -> None:
         self.download_raw_0(overwrite=False)
 
-    def preprocess(self, step=0):
+    def preprocess(self, step: int | str = 0) -> None:
         if step == 0:
             self.convert_pd_1()
             self.remap_id_2()
@@ -270,7 +272,7 @@ class ElectronicsData(DataSet):
 
 
 class CriteoDataBak(DataSet):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(CriteoDataBak, self).__init__(*args, **kwargs)
         self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
@@ -278,17 +280,20 @@ class CriteoDataBak(DataSet):
         self.criteo_kaggle_test = self.path_root + "/criteo/test.txt"
         self.sample_num = 1000000
 
-    def download(self, mode=1):
+    def download(self, mode: int = 1) -> None:
         if mode == 1:
             self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
             self.dataset.download("criteo-kaggle", path_root=self.path_root)
-            os.system("cd " + self.path_root + "/criteo && tar -zxvf dac.tar.gz")
+            run_shell_list(
+                ["tar", "-zxvf", "dac.tar.gz"],
+                cwd=os.path.join(self.path_root, "criteo"),
+            )
 
     def preprocess(self, step=0):
         pass
 
-    def _sparseFeature(self, feat, feat_num, embed_dim=4):
+    def _sparseFeature(self, feat: str, feat_num: int, embed_dim: int = 4) -> dict:
         """
         create dictionary for sparse feature
         :param feat: feature name
@@ -298,7 +303,7 @@ class CriteoDataBak(DataSet):
         """
         return {"feat": feat, "feat_num": feat_num, "embed_dim": embed_dim}
 
-    def _denseFeature(self, feat):
+    def _denseFeature(self, feat: str) -> dict:
         """
         create dictionary for dense feature
         :param feat: dense feature name
@@ -318,6 +323,9 @@ class CriteoDataBak(DataSet):
         :param test_size: ratio of train dataset to test dataset
         :return: feature columns, train, test
         """
+        from sklearn.model_selection import train_test_split
+        from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+
         names = [
             "label",
             "I1",
@@ -413,7 +421,7 @@ class CriteoDataBak(DataSet):
 
         return feature_columns, (train_X, train_y), (test_X, test_y)
 
-    def build_dataset(self, mode=1):
+    def build_dataset(self, mode: int = 1) -> object:
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:
@@ -423,7 +431,9 @@ class CriteoDataBak(DataSet):
 
 
 class CriteoData(DataSet):
-    def __init__(self, *args, **kwargs):
+    """Criteo 数据集处理器。"""
+
+    def __init__(self, *args: object, **kwargs: object) -> None:
         super(CriteoData, self).__init__(*args, **kwargs)
         self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
@@ -433,12 +443,15 @@ class CriteoData(DataSet):
         self.feature_file = self.path_root + "/criteo/feature_layers.json"
         self.sample_num = 1000000
 
-    def download(self, mode=1):
+    def download(self, mode: int = 1) -> None:
         if mode == 1:
             self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
             self.dataset.download("criteo-kaggle", path_root=self.path_root)
-            os.system("cd " + self.path_root + "/criteo && tar -zxvf dac.tar.gz")
+            run_shell_list(
+                ["tar", "-zxvf", "dac.tar.gz"],
+                cwd=os.path.join(self.path_root, "criteo"),
+            )
 
     def _create_criteo_dataset(
         self,
@@ -458,6 +471,11 @@ class CriteoData(DataSet):
         :param test_size: ratio of train dataset to test dataset
         :return: feature columns, train, test
         """
+        import tensorflow as tf
+        from notekeras.features.feature_parse import define_feature_json
+        from sklearn.model_selection import train_test_split
+        from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+
         dense_features = ["I" + str(i) for i in range(1, 14)]
         sparse_features = ["C" + str(i) for i in range(1, 27)]
         names = ["label", *dense_features, *sparse_features]
@@ -534,12 +552,12 @@ class CriteoData(DataSet):
         }
 
         with open(self.feature_file, "w") as writer:
-            writer.write(demjson.encode(feature_layers))
+            json.dump(feature_layers, writer, ensure_ascii=False)
 
         return feature_layers, train_d, test_d
         # return feature_layers, (train.to_dict(orient='list'), train[['label']].to_dict(orient='list')), (test.to_dict(orient='list'), test[['label']].to_dict(orient='list'))
 
-    def build_dataset(self, mode=1, batch_size=1024):
+    def build_dataset(self, mode: int = 1, batch_size: int = 1024) -> object:
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:

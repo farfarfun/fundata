@@ -1,12 +1,15 @@
 from fundata.dataset import CriteoData, ElectronicsData
+from farlog import getLogger
+
+logger = getLogger(__name__)
 
 electronic = ElectronicsData()
 # electronic.download()
 
 criteo = CriteoData()
 criteo.download()
-print(criteo.criteo_sample)
-print(criteo.build_dataset())
+logger.info(criteo.criteo_sample)
+logger.info(criteo.build_dataset())
 # electronic.download_raw_0()
 # get_electronics(dataset=data)
 # get_movielens(dataset=data)

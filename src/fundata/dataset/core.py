@@ -7,12 +7,14 @@ from ..manage import DatasetManage
 logger = getLogger(__name__)
 
 
-def get_electronics(dataset: DatasetManage = None):
+def get_electronics(dataset: DatasetManage | None = None) -> None:
+    """下载并处理 Amazon Electronics 数据集。"""
     electronic = ElectronicsData(dataset=dataset, data_path="./download/")
     electronic.init_data()
 
 
-def get_movielens(dataset: DatasetManage = None):
+def get_movielens(dataset: DatasetManage | None = None) -> None:
+    """下载 MovieLens 数据集。"""
     dataset.download("movielens-100k", overwrite=False)
     dataset.download("movielens-1m", overwrite=False)
     dataset.download("movielens-10m", overwrite=False)
@@ -21,7 +23,8 @@ def get_movielens(dataset: DatasetManage = None):
     # os.system('cd ' + file_path(data.path) + ' && unzip ' + file_name(data.path))
 
 
-def get_adult_data(dataset: DatasetManage = None):
+def get_adult_data(dataset: DatasetManage | None = None) -> None:
+    """下载并读取 Adult 数据集。"""
     data_train = dataset.download("adult-train", overwrite=False)
     data_test = dataset.download("adult-test", overwrite=False)
 
@@ -66,10 +69,12 @@ def get_adult_data(dataset: DatasetManage = None):
     # return train_x, train_y, test_x, test_y
 
 
-def get_porto_seguro_data(dataset: DatasetManage = None):
+def get_porto_seguro_data(dataset: DatasetManage | None = None) -> None:
+    """下载 Porto Seguro 训练和测试数据。"""
     dataset.download("porto-seguro-train")
     dataset.download("porto-seguro-test")
 
 
-def get_bitly_usagov_data(dataset: DatasetManage = None):
+def get_bitly_usagov_data(dataset: DatasetManage | None = None) -> None:
+    """下载 Bitly USA.gov 数据。"""
     dataset.download("bitly-usagov")

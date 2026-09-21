@@ -10,15 +10,9 @@ lanzou branch, which has no drop-in replacement in the current
 ``fundrive`` API) raise ``NotImplementedError`` instead of failing at
 import time.
 
-``fundata.dataset`` is a separate, still-unresolved case: ``dataset/datas.py``
-imports ``demjson`` / ``tensorflow`` / ``notekeras`` / ``scikit-learn``
-directly. These are now declared under the ``dataset`` extra
-(``pip install fundata[dataset]``) rather than the default dependencies,
-but are not installed in this test environment. (``notekeras`` is
-intentional, not a leftover: the published ``funkeras`` PyPI package
-still ships its code under the top-level importable name ``notekeras``,
-so that import must stay as-is.) So ``fundata.dataset`` still cannot be
-imported here -- documented and skipped below rather than faked as passing.
+``fundata.dataset`` imports without the optional ML stack; tests below cover
+its lightweight public classes. Criteo processing remains guarded by the
+``dataset`` extra and is tested separately in environments that install it.
 """
 
 import logging
@@ -99,9 +93,7 @@ def test_tables_bak_sqlite_table_crud_smoke(tmp_path):
     from fundata.tables_bak.core import SqliteTable
 
     db_path = tmp_path / "smoke.db"
-    table = SqliteTable(
-        db_path=str(db_path), table_name="demo", columns=["id", "name"]
-    )
+    table = SqliteTable(db_path=str(db_path), table_name="demo", columns=["id", "name"])
     try:
         table.execute(
             "create table if not exists demo (id varchar(50) primary key, name varchar(50))"
@@ -143,7 +135,7 @@ def test_tables_bak_delete_condition_bug(tmp_path):
     pytest.skip(
         "已发现但未修复的源码问题：BaseTable.delete() 在 condition 为 dict 时，"
         "未像 update() 一样对 _condition2equal() 返回的 list 做 ' and '.join()，"
-        "导致拼出的 SQL 形如 \"delete from demo where [\\\"id='1'\\\"]\"，"
+        '导致拼出的 SQL 形如 "delete from demo where [\\"id=\'1\'\\"]"，'
         "而 SqliteTable.execute() 会吞掉这个 sqlite3 语法错误并静默返回 None，"
         "因此 delete(dict 条件) 实际上什么都不会删除。按审计范围要求不修复源码，"
         "此处跳过并记录该发现。"
@@ -171,20 +163,7 @@ def test_manage_dataset_manage_smoke(tmp_path):
 
 
 def test_manage_lanzou_download_not_implemented(tmp_path):
-    """The lanzou branch of DatasetManage.download() has no drop-in
-    replacement for a free-function-style download() helper (current
-    fundrive.drives.lanzou.LanZouDrive is class-based and needs an
-    authenticated instance) -- it raises NotImplementedError instead of
-    ImportError-ing the whole module.
-
-    Note: DatasetManage.decode() does `json.loads(json.loads(urls))` --
-    i.e. it expects `urls` to be *double* JSON-encoded -- while
-    `encode()` (used by `insert()`) only encodes it *once*. That
-    asymmetry is a separate, pre-existing bug (same flavour as the
-    `delete()` condition bug above); this test works around it by
-    storing a double-encoded value directly so `decode()` succeeds and
-    execution actually reaches the lanzou branch under test.
-    """
+    """未配置认证时，蓝奏云下载明确报告不可用。"""
     import json
 
     from fundata.manage.core import DatasetManage
@@ -203,17 +182,13 @@ def test_manage_lanzou_download_not_implemented(tmp_path):
     dataset.close()
 
 
-def test_import_dataset_submodule_requires_unavailable_deps():
-    """fundata.dataset (core.py / datas.py / images.py) imports `fundata.manage`
-    locally, but `dataset/datas.py` separately imports tensorflow /
-    notekeras / demjson / scikit-learn directly. These are declared under
-    the `dataset` extra (`pip install fundata[dataset]`) but are not
-    installed in this test environment, so the submodule still can't be
-    imported here.
-    """
-    pytest.skip(
-        "fundata.dataset 内部 dataset/datas.py 直接 import demjson / tensorflow / "
-        "notekeras / scikit-learn，均已收录进 pyproject.toml 的 `dataset` extra"
-        "（pip install fundata[dataset]），但测试环境未安装这组重型 ML 依赖，"
-        "因此该子模块仍无法在此处导入，跳过而非伪造通过。"
-    )
+def test_dataset_public_classes_import_and_base_contract(tmp_path):
+    """数据集公开类可导入，基类契约在无网络环境下可执行。"""
+    from fundata.dataset import CriteoData, ElectronicsData
+
+    electronics = ElectronicsData(data_path=str(tmp_path))
+    criteo = CriteoData(data_path=str(tmp_path))
+    assert electronics.path_root == str(tmp_path)
+    assert criteo.criteo_sample.endswith("criteo/criteo_sample.txt")
+    with pytest.raises(NotImplementedError):
+        electronics.build_dataset()

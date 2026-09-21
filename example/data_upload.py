@@ -1,39 +1,40 @@
-import logging
+"""使用 fundrive 操作蓝奏云的示例。"""
 
-from notedrive.lanzou import LanZouCloud, CodeDetail, download
-from notedrive.lanzou.utils import logger
+from farlog import getLogger
+from fundrive import get_drive
 
-logger.setLevel(logging.DEBUG)
+logger = getLogger(__name__)
 
-downer = LanZouCloud()
-downer.ignore_limits()
 
-downer.login_by_cookie()
+def drive():
+    """创建已登录的蓝奏云驱动；凭据由 fundrive/funsecret 读取。"""
+    result = get_drive("lanzou")
+    result.ignore_limit()
+    result.login()
+    return result
 
 
 def example1():
-    print(downer.login_by_cookie() == CodeDetail.SUCCESS)
+    """验证蓝奏云登录状态。"""
+    return drive()
 
 
 def example2():
+    """上传一个文件。"""
     file_path = "/Users/liangtaoniu/workspace/MyDiary/tmp/weights/yolov3.weight"
-    downer.upload_file(file_path=file_path)
+    return drive().upload_file(file_path=file_path, fid="2184164")
 
 
 def example3():
-    print("download")
-    download("https://wws.lanzous.com/izZmlfjulvg", dir_pwd="./download/test")
-
-    # download('https://wws.lanzous.com/b01hjn3aj', dir_pwd='./download/lanzou')
-
-    # download('https://wws.lanzous.com/b01hh63kf', dir_pwd='./download/lanzou')
-    # downer.down_dir_by_url('https://wws.lanzous.com/b01hh2zve', dir_pwd='./download/lanzou')
-
-    pass
+    """按分享链接解析文件并下载到本地。"""
+    result = drive().get_file_list(url="https://wws.lanzous.com/izZmlfjulvg")
+    if not result:
+        raise FileNotFoundError("分享链接中没有文件")
+    return drive().download_file(result[0].fid, save_dir="./download/test")
 
 
 def example4():
-    print("upload")
+    """上传模型文件。"""
     res = None
     # downer.upload_file('/Users/liangtaoniu/workspace/MyDiary/tmp/models/yolo/configs/yolov3.h5', folder_id=2129808)
     # downer.upload_file('/Users/liangtaoniu/workspace/MyDiary/tmp/models/yolo/configs/yolov3.weights', folder_id=2129808)
@@ -49,22 +50,13 @@ def example4():
 
     # res = downer.upload_file('/Users/liangtaoniu/workspace/dataset/models/ml-25m.zip', folder_id=2184164)
     # res = downer.upload_file('/Users/liangtaoniu/workspace/dataset/models/train_data.csv', folder_id=2214573)
-    res = downer.upload_file(
+    res = drive().upload_file(
         "/Users/liangtaoniu/workspace/dataset/models/label_file.csv", folder_id=2214573
     )
 
-    print(res)
-    pass
+    return res
 
 
 def example5():
-    print(downer.get_dir_list(folder_id=2184164))
-
-
-# example1()
-# example2()
-example3()
-# example4()
-# example5()
-# https://wws.lanzous.com/b01hjn3aj
-# print(downer._session.cookies)
+    """列出目录文件。"""
+    return drive().get_dir_list(fid=2184164)
