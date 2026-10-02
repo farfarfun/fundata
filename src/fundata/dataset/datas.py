@@ -57,7 +57,8 @@ class ElectronicsData(DataSet):
         self.pkl_remap = self.path_root + "/electronics/raw_data/remap.pkl"
         self.pkl_dataset = self.path_root + "/electronics/raw_data/dataset.pkl"
 
-    def download_raw_0(self, overwrite=False):
+    def download_raw_0(self, overwrite: bool = False) -> None:
+        """下载并解压 Amazon Electronics 原始数据。"""
         self.dataset.download(
             "electronics-reviews", overwrite=overwrite, path_root=self.path_root
         )
@@ -247,6 +248,7 @@ class ElectronicsData(DataSet):
             )
 
     def init_data(self, overwrite: bool = False) -> None:
+        """依次下载、转换并构建 Amazon Electronics 数据集。"""
         self.download_raw_0(overwrite=overwrite)
 
         self.convert_pd_1(overwrite=overwrite)
@@ -256,9 +258,11 @@ class ElectronicsData(DataSet):
         self.build_dataset_3(overwrite=overwrite)
 
     def download(self, mode: int = 1) -> None:
+        """下载 Amazon Electronics 原始数据。"""
         self.download_raw_0(overwrite=False)
 
     def preprocess(self, step: int | str = 0) -> None:
+        """执行指定步骤或全部 Amazon Electronics 预处理步骤。"""
         if step == 0:
             self.convert_pd_1()
             self.remap_id_2()
@@ -281,6 +285,7 @@ class CriteoDataBak(DataSet):
         self.sample_num = 1000000
 
     def download(self, mode: int = 1) -> None:
+        """按模式下载旧版 Criteo 样例或 Kaggle 数据。"""
         if mode == 1:
             self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
@@ -290,7 +295,8 @@ class CriteoDataBak(DataSet):
                 cwd=os.path.join(self.path_root, "criteo"),
             )
 
-    def preprocess(self, step=0):
+    def preprocess(self, step: int = 0) -> None:
+        """预处理旧版 Criteo 数据；当前保留为空实现。"""
         pass
 
     def _sparseFeature(self, feat: str, feat_num: int, embed_dim: int = 4) -> dict:
@@ -312,17 +318,14 @@ class CriteoDataBak(DataSet):
         return {"feat": feat}
 
     def _create_criteo_dataset(
-        self, file, embed_dim=8, read_part=True, sample_num=100000, test_size=0.2
-    ):
-        """
-        a example about creating criteo dataset
-        :param file: dataset's path
-        :param embed_dim: the embedding dimension of sparse features
-        :param read_part: whether to read part of it
-        :param sample_num: the number of instances if read_part is True
-        :param test_size: ratio of train dataset to test dataset
-        :return: feature columns, train, test
-        """
+        self,
+        file: str,
+        embed_dim: int = 8,
+        read_part: bool = True,
+        sample_num: int = 100000,
+        test_size: float = 0.2,
+    ) -> tuple[object, object, object]:
+        """读取 Criteo 文件并返回特征列、训练集和测试集。"""
         from sklearn.model_selection import train_test_split
         from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
@@ -422,6 +425,7 @@ class CriteoDataBak(DataSet):
         return feature_columns, (train_X, train_y), (test_X, test_y)
 
     def build_dataset(self, mode: int = 1) -> object:
+        """按模式构建旧版 Criteo 训练和测试数据。"""
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:
@@ -444,6 +448,7 @@ class CriteoData(DataSet):
         self.sample_num = 1000000
 
     def download(self, mode: int = 1) -> None:
+        """按模式下载 Criteo 样例或 Kaggle 数据。"""
         if mode == 1:
             self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
@@ -455,22 +460,14 @@ class CriteoData(DataSet):
 
     def _create_criteo_dataset(
         self,
-        file,
-        embed_dim=8,
-        read_part=True,
-        sample_num=100000,
-        test_size=0.2,
-        batch_size=128,
-    ):
-        """
-        a example about creating criteo dataset
-        :param file: dataset's path
-        :param embed_dim: the embedding dimension of sparse features
-        :param read_part: whether to read part of it
-        :param sample_num: the number of instances if read_part is True
-        :param test_size: ratio of train dataset to test dataset
-        :return: feature columns, train, test
-        """
+        file: str,
+        embed_dim: int = 8,
+        read_part: bool = True,
+        sample_num: int = 100000,
+        test_size: float = 0.2,
+        batch_size: int = 128,
+    ) -> tuple[object, object, object]:
+        """读取 Criteo 文件并返回特征配置、训练集和测试集。"""
         import tensorflow as tf
         from notekeras.features.feature_parse import define_feature_json
         from sklearn.model_selection import train_test_split
@@ -558,6 +555,7 @@ class CriteoData(DataSet):
         # return feature_layers, (train.to_dict(orient='list'), train[['label']].to_dict(orient='list')), (test.to_dict(orient='list'), test[['label']].to_dict(orient='list'))
 
     def build_dataset(self, mode: int = 1, batch_size: int = 1024) -> object:
+        """按模式构建批处理后的 Criteo 训练和测试数据。"""
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:

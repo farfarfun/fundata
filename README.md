@@ -4,7 +4,7 @@
 
 `fundata.work`、`fundata.manage`、`fundata.tables_bak` 可以正常 import 和使用。`DatasetManage.download()` 中蓝奏云下载分支会抛出 `NotImplementedError`：当前 `fundrive` 的蓝奏云 API 是基于类的 `fundrive.drives.lanzou.LanZouDrive`，需要已认证的实例，没有免认证的下载函数可用。
 
-`fundata.dataset` 可以在不安装重型机器学习依赖时导入；构建 Criteo 数据集时才需要安装 `dataset` extra。`tensorflow`、`scikit-learn`、`funkeras`（提供 `notekeras`）已收录进 `pyproject.toml` 的 `dataset` extra，默认不随主依赖安装。
+`fundata.dataset` 可以在不安装重型机器学习依赖时导入；构建 Criteo 数据集时才需要安装 `dataset` extra。`tensorflow`、`keras`、`scikit-learn`、`funkeras`（提供 `notekeras`）已收录进 `pyproject.toml` 的 `dataset` extra，默认不随主依赖安装。
 
 - `notekeras`：PyPI 上的 `funkeras` 包实际发布的顶层可 import 模块名仍然是 `notekeras`（`pip install funkeras` 装出来的目录是 `notekeras/`），因此代码里 `from notekeras.features.feature_parse import ...` 这一行即使装了 `funkeras` 也必须保持 `notekeras` 这个导入名不变，才能正确工作。
 
@@ -22,22 +22,28 @@ pip install fundata
 pip install "fundata[dataset]"
 ```
 
-`pyproject.toml` 中已声明的 `dependencies` 为 `pandas`、`funshell`、`farlog`、`tqdm`，安装后 `fundata`（顶层）、`fundata.work`、`fundata.manage`、`fundata.tables_bak`、`fundata.dataset` 均可正常导入。构建 Criteo 数据集时需要额外安装 `dataset` extra。
+基础包支持 Python 3.10；`dataset` extra 的机器学习依赖需要 Python 3.11 或更高版本，
+以确保安装包含安全修复的 Keras 版本。
+
+`pyproject.toml` 中已声明的 `dependencies` 为 `numpy`、`pandas`、`funshell`、`farlog`、`tqdm`，安装后 `fundata`（顶层）、`fundata.work`、`fundata.manage`、`fundata.tables_bak`、`fundata.dataset` 均可正常导入。构建 Criteo 数据集时需要额外安装 `dataset` extra。
 
 ## 用法示例
 
-维护一份数据集索引，并按需从蓝奏云下载：
+创建并查询本地数据集索引：
 
 ```python
 from fundata.manage.core import DatasetManage
 from fundata.manage.library import insert_library
 
-dataset = DatasetManage()
+dataset = DatasetManage(db_path="./fundata.db")
 dataset.create()
-insert_library()  # 把 iris/movielens/criteo/coco/yolo 权重等的下载地址写入本地 sqlite
-
-dataset.download("movielens-100k", path_root="./download/")
+insert_library(dataset)  # 把内置下载地址写入当前目录的 sqlite 索引
+records = dataset.select(condition={"name": "movielens-100k"})
+print(records[0]["urls"])
 ```
+
+索引中的蓝奏云地址目前不能直接下载：`DatasetManage.download()` 遇到此类记录会抛出
+`NotImplementedError`，需先接入已认证的 `fundrive.drives.lanzou.LanZouDrive` 实例。
 
 管理数据落盘目录（数据库/日志/公共文件），默认落在 `/opt/farfarfun/apps/fundata`：
 

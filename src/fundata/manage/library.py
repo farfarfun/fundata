@@ -8,7 +8,7 @@ from .core import DatasetManage
 logger = getLogger(__name__)
 
 
-def check():
+def check() -> None:
     """校验库内第一条记录的 urls 字段能否正常解码，用于调试。"""
     dataset = DatasetManage()
     dataset.create()
@@ -19,7 +19,8 @@ def check():
     logger.info(f"source={d1['source']}")
 
 
-def insert_library():
+def insert_library(dataset: DatasetManage | None = None) -> None:
+    """将内置的公开数据集元信息写入指定或默认数据集索引。"""
     lines = []
     # iris
     lines.extend(
@@ -272,7 +273,7 @@ def insert_library():
         ]
     )
 
-    dataset = DatasetManage()
+    dataset = dataset or DatasetManage()
     dataset.create()
     for line in tqdm(lines):
         dataset.insert(line)

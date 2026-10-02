@@ -9,7 +9,8 @@ pd.set_option("display.max_rows", 200)
 pd.set_option("max_colwidth", 500)
 
 
-def dataset_coco(data_root="./download/coco/"):
+def dataset_coco(data_root: str = "./download/coco/") -> None:
+    """将 COCO 标注转换为每张图片一行的训练和验证清单。"""
     # step1 (download+decompress raw COCO archives) relied on download+decompress
     # helpers that no longer exist and was already disabled (never called)
     # before this fix; removed rather than reimplemented.

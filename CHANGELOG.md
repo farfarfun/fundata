@@ -11,9 +11,9 @@
 
 ### 修复
 
-- `requires-python` 下限由 `>=3.10` 提升至 `>=3.11`：Python 3.10 环境下 `dataset` extra 会解析
-  到 `keras==3.12.4`（受 GHSA 安全公告影响，< 3.15.0 均存在漏洞），3.11+ 才能解析到已修复的
-  `keras==3.15.1`；提交更新后的 `uv.lock`。
+- `requires-python` 下限保持为组织统一的 `>=3.10`；`dataset` extra 中需要安全版
+  Keras 的机器学习依赖通过环境标记限定为 Python 3.11+，并重新生成 `uv.lock`。
+- 显式声明源码直接导入的 `numpy` 运行时依赖。
 - `pandas`、`tqdm` 补上版本下限，避免解析到过旧版本。
 - `SqliteTable.execute()` 不再吞掉 SQL 执行异常并 `print`，改为记录带表名/路径/SQL 的错误日志后抛出 `TableQueryError`。
 - `BaseTable` 中裸 `raise Exception(...)` 改为 `NotImplementedError`（抽象方法）或 `TableConfigError`（字段未配置）。

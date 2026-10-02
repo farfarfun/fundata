@@ -206,7 +206,7 @@ class BaseTable:
             sql = "delete from {} where {}".format(self.table_name, condition)
         elif isinstance(condition, dict):
             sql = "delete from {} where {}".format(
-                self.table_name, self._condition2equal(condition)
+                self.table_name, " and ".join(self._condition2equal(condition))
             )
         else:
             sql = None

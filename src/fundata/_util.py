@@ -8,7 +8,8 @@ fundata actually needs.
 import os
 
 
-def path_parse(path):
+def path_parse(path: str | None) -> str | None:
+    """将用户目录和相对路径展开为绝对路径。"""
     if path is None:
         return path
     path = os.path.expanduser(path)
@@ -17,13 +18,15 @@ def path_parse(path):
     return path
 
 
-def exist_and_create(file_dir):
+def exist_and_create(file_dir: str) -> str:
+    """创建尚不存在的目录并返回目录路径。"""
     if file_dir and not os.path.exists(file_dir):
         os.makedirs(file_dir)
     return file_dir
 
 
-def exists_file(file_path, mkdir=False):
+def exists_file(file_path: str, mkdir: bool = False) -> bool:
+    """检查文件是否存在，并可预先创建其父目录。"""
     if mkdir:
         exist_and_create(os.path.dirname(file_path))
     return os.path.exists(file_path)
