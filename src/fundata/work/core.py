@@ -10,7 +10,11 @@ class WorkApp:
         """初始化应用目录配置。"""
         # 默认路径 /opt/farfarfun/... 需要 root/系统级写权限；非特权环境可通过
         # FUNDATA_APP_DIR 环境变量整体覆盖，或直接传入 dir_app 参数。
-        self.dir_app = dir_app or os.environ.get("FUNDATA_APP_DIR") or f"/opt/farfarfun/apps/{app_name}"
+        self.dir_app = (
+            dir_app
+            or os.environ.get("FUNDATA_APP_DIR")
+            or f"/opt/farfarfun/apps/{app_name}"
+        )
 
         self.dir_db = os.path.join(self.dir_app, "databases")
         self.dir_log = os.path.join(self.dir_app, "logs")

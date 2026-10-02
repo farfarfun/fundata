@@ -1,7 +1,1 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-# @Time    : 2019/04/02 20:01
-# @Author  : niuliangtao
-# @Site    :
-# @File    : __init__.py.py
-# @Software: PyCharm
+"""fundata：公开数据集与模型权重的索引、下载和落盘目录管理工具库。"""

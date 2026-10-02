@@ -11,11 +11,14 @@ pd.set_option("max_colwidth", 500)
 
 def dataset_coco(data_root: str = "./download/coco/") -> None:
     """将 COCO 标注转换为每张图片一行的训练和验证清单。"""
+
     # step1 (download+decompress raw COCO archives) relied on download+decompress
     # helpers that no longer exist and was already disabled (never called)
     # before this fix; removed rather than reimplemented.
-    def step2(json_path, target_file):
-        json_data = json.load(open(json_path))
+    def step2(json_path: str, target_file: str) -> None:
+        """把单个 COCO 标注文件转换成每张图片一行的清单并落盘。"""
+        with open(json_path, encoding="utf-8") as json_file:
+            json_data = json.load(json_file)
         df_annotations = pd.DataFrame.from_dict(json_data["annotations"])
 
         df_categories = pd.DataFrame.from_dict(json_data["categories"])
@@ -39,14 +42,8 @@ def dataset_coco(data_root: str = "./download/coco/") -> None:
         )
 
         df_annotations["label"] = df_annotations["bbox"].apply(
-            lambda x: "{},{},{},{},".format(
-                int(x[0]), int(x[1]), int(x[2] + x[0]), int(x[3] + x[1])
-            )
+            lambda x: f"{int(x[0])},{int(x[1])},{int(x[2] + x[0])},{int(x[3] + x[1])},"
         ) + df_annotations["index"].astype("str")
-        df_annotations["image_path"] = df_annotations["image_id"].apply(
-            lambda x: data_root + "/images/{}.jpg".format(x)
-        )
-
         df_annotations["image_path"] = df_annotations["image_id"].apply(
             lambda x: data_root + "/images/{}{}.jpg".format("0" * (12 - len(str(x))), x)
         )

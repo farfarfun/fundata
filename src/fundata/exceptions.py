@@ -14,3 +14,11 @@ class TableConfigError(FunDataError):
 
 class TableQueryError(FunDataError):
     """执行 SQL 语句失败。"""
+
+
+class DatasetNotFoundError(FunDataError):
+    """请求的数据集不在本地索引中。"""
+
+
+class DatasetDownloadError(FunDataError):
+    """数据集下载失败，或记录里没有可用的下载地址。"""

@@ -1,11 +1,12 @@
 [project]
 name = "fundata"
-version = "1.0.4"
+version = "1.0.5"
 description = "用于索引、下载和管理常见机器学习公开数据集的工具库"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
+authors = [{ name = "牛哥", email = "farfarfun@qq.com" }]
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
@@ -18,10 +19,13 @@ dependencies = [
 # fundata.dataset 下的具体数据集处理类（ElectronicsData/CriteoData 等）依赖的重型 ML 库，
 # 主依赖不默认安装，按需通过 `pip install fundata[dataset]` 引入。
 #
+# TensorFlow/Keras 链路带 `python_version >= '3.11'` 标记：keras 3.13 起才要求
+# Python 3.11，在 3.10 上能解析到的最高版本是 3.12.4，仍在 Keras 安全公告的受影响
+# 区间（< 3.15.0）内。scikit-learn 与 Keras 无关，CriteoDataBak 只用它，不加标记。
 dataset = [
     "tensorflow>=2.15; python_version >= '3.11'",
     "keras>=3.15; python_version >= '3.11'",
-    "scikit-learn>=1.3; python_version >= '3.11'",
+    "scikit-learn>=1.3",
     "funkeras>=0.8; python_version >= '3.11'",
 ]
 
@@ -33,3 +37,13 @@ dev = [
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.ruff]
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "W"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

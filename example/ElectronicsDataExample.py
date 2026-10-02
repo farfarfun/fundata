@@ -1,8 +1,9 @@
 import pickle
 import random
 
-from fundata.manage import DatasetManage
 from farlog import getLogger
+
+from fundata.manage import DatasetManage
 
 logger = getLogger(__name__)
 
@@ -12,7 +13,7 @@ random.seed(1234)
 data_root = "/Users/liangtaoniu/tmp/dataset/electronics"
 logger.info("read and process data")
 
-with open("{}/raw_data/remap.pkl".format(data_root), "rb") as f:
+with open(f"{data_root}/raw_data/remap.pkl", "rb") as f:
     reviews_df = pickle.load(f)
     cate_list = pickle.load(f)
     user_count, item_count, cate_count, example_count = pickle.load(f)
@@ -55,7 +56,7 @@ def print_to_file(data, fout):
 
 
 logger.info("make train data")
-with open("{}/paddle_train.txt".format(data_root), "w") as fout:
+with open(f"{data_root}/paddle_train.txt", "w") as fout:
     for line in train_set:
         history = line[1]
         target = line[2]
@@ -68,7 +69,7 @@ with open("{}/paddle_train.txt".format(data_root), "w") as fout:
         fout.write(str(label) + "\n")
 
 logger.info("make test data")
-with open("{}/paddle_test.txt".format(data_root), "w") as fout:
+with open(f"{data_root}/paddle_test.txt", "w") as fout:
     for line in test_set:
         history = line[1]
         target = line[2]
@@ -87,7 +88,7 @@ with open("{}/paddle_test.txt".format(data_root), "w") as fout:
         fout.write("0\n")
 
 logger.info("make config data")
-with open("{}/config.txt".format(data_root), "w") as f:
+with open(f"{data_root}/config.txt", "w") as f:
     f.write(str(user_count) + "\n")
     f.write(str(item_count) + "\n")
     f.write(str(cate_count) + "\n")

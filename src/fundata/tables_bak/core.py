@@ -109,7 +109,7 @@ class BaseTable:
         for key in self.columns:
             value = str(properties.get(key, ""))
             if len(value) > 0 and len(key) > 0:
-                values.append("{}='{}'".format(key, value))
+                values.append(f"{key}='{value}'")
 
         sql = """select count(1) from {} where {}""".format(
             self.table_name, " and ".join(values)
@@ -126,7 +126,9 @@ class BaseTable:
         """
         return self.select("select * from table_name")
 
-    def select(self, sql: str | None = None, condition: dict | None = None) -> list[dict]:
+    def select(
+        self, sql: str | None = None, condition: dict | None = None
+    ) -> list[dict]:
         """
         根据sql或者指定条件选择数据
         :param sql: sql
@@ -160,7 +162,7 @@ class BaseTable:
             value = str(properties.get(key, "")).replace("'", "")
             if len(key) > 0 and len(value) > 0:
                 keys.append(key)
-                values.append("'{}'".format(value))
+                values.append(f"'{value}'")
         return keys, values
 
     def _condition2equal(self, properties: dict | str) -> list[str] | str:
@@ -180,10 +182,20 @@ class BaseTable:
             value = properties.get(key, None)
             if len(key) > 0 and value is not None:
                 if isinstance(value, str):
-                    equals.append("{}='{}'".format(key, value))
+                    equals.append(f"{key}='{value}'")
                 else:
-                    equals.append("{}={}".format(key, value))
+                    equals.append(f"{key}={value}")
         return equals
+
+    def _where_clause(self, condition: dict | str) -> str:
+        """把字典或字符串条件统一转换成 where 子句。
+
+        :param condition: 字典条件（字段=值，多个字段用 and 连接）或原始 where 字符串
+        :return: where 子句字符串
+        """
+        if isinstance(condition, str):
+            return condition
+        return " and ".join(self._condition2equal(condition))
 
     def sql_format(self, sql: str) -> str:
         """
@@ -196,43 +208,46 @@ class BaseTable:
 
     def delete(self, condition: dict | str | None = None) -> None:
         """
-        删除表
-        :param condition:
-        :return:
+        删除满足条件的记录，不传条件则清空表
+        :param condition: 字典条件或原始 where 字符串
+        :return: 无
         """
         if condition is None:
-            sql = "delete from {}".format(self.table_name)
-        elif isinstance(condition, str):
-            sql = "delete from {} where {}".format(self.table_name, condition)
-        elif isinstance(condition, dict):
-            sql = "delete from {} where {}".format(
-                self.table_name, " and ".join(self._condition2equal(condition))
-            )
+            sql = f"delete from {self.table_name}"
+        elif isinstance(condition, str | dict):
+            sql = f"delete from {self.table_name} where {self._where_clause(condition)}"
         else:
             sql = None
         if sql is not None:
             self.execute(sql)
-            self.logger.info("delete records with sql = {}".format(sql))
+            self.logger.info(f"delete records with sql = {sql}")
 
 
 class SqliteTable(BaseTable):
     def __init__(
-        self, db_path: str, conn: sqlite3.Connection | None = None, *args: Any, **kwargs: Any
+        self,
+        db_path: str,
+        conn: sqlite3.Connection | None = None,
+        *args: Any,
+        **kwargs: Any,
     ) -> None:
         """
         基于 sqlite3 的表实现。
         :param db_path: 数据库文件路径
         :param conn: 已建立的连接，不传则按 db_path 新建
         """
-        super(SqliteTable, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.db_path = db_path
-        if not os.path.exists(os.path.dirname(self.db_path)):
-            os.makedirs(os.path.dirname(self.db_path))
+        parent = os.path.dirname(self.db_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
         self.conn = conn or sqlite3.connect(self.db_path, check_same_thread=False)
         self.cursor = self.conn.cursor()
-        self.logger.info("db path:{}".format(self.db_path))
+        self.logger.info(f"db path:{self.db_path}")
 
-    def execute(self, sql: str, commit: bool = True, *args: Any, **kwargs: Any) -> sqlite3.Cursor:
+    def execute(
+        self, sql: str, commit: bool = True, *args: Any, **kwargs: Any
+    ) -> sqlite3.Cursor:
         """
         sql执行核心
         :param commit: 是否需要commit
@@ -247,13 +262,9 @@ class SqliteTable(BaseTable):
             return rows
         except sqlite3.Error as e:
             self.logger.error(
-                "执行 SQL 失败: table={} db_path={} sql={} error={}".format(
-                    self.table_name, self.db_path, sql, e
-                )
+                f"执行 SQL 失败: table={self.table_name} db_path={self.db_path} sql={sql} error={e}"
             )
-            raise TableQueryError(
-                f"表 {self.table_name} 执行 SQL 失败: {e}"
-            ) from e
+            raise TableQueryError(f"表 {self.table_name} 执行 SQL 失败: {e}") from e
 
     def close(self) -> None:
         """
@@ -276,7 +287,7 @@ class SqliteTable(BaseTable):
         将全表数据导出为 csv 后清空表，并执行 VACUUM 回收空间。
         :return: 导出前的全表数据
         """
-        result = pd.read_sql("select * from {}".format(self.table_name), self.conn)
+        result = pd.read_sql(f"select * from {self.table_name}", self.conn)
 
         count = len(result)
         path = "{}/{}-{}-{}".format(
@@ -286,10 +297,10 @@ class SqliteTable(BaseTable):
             strftime("%Y%m%d#%H:%M:%S", time.localtime()),
         )
         result.to_csv(path)
-        self.logger.info("save to csv:{}->{}".format(count, path))
+        self.logger.info(f"save to csv:{count}->{path}")
 
-        self.execute("delete from {}".format(self.table_name))
-        self.logger.info("delete from {}".format(self.table_name))
+        self.execute(f"delete from {self.table_name}")
+        self.logger.info(f"delete from {self.table_name}")
         self.vacuum()
         return result
 
@@ -309,9 +320,11 @@ class SqliteTable(BaseTable):
         :return: 导出文件路径
         """
         if condition is None:
-            sql = "select * from {}".format(self.table_name)
+            sql = f"select * from {self.table_name}"
         else:
-            sql = "select * from {} where {}".format(self.table_name, condition)
+            sql = (
+                f"select * from {self.table_name} where {self._where_clause(condition)}"
+            )
 
         path = path or (
             "{}/{}-{}".format(
@@ -320,11 +333,9 @@ class SqliteTable(BaseTable):
                 strftime("%Y%m%d#%H:%M:%S", time.localtime()),
             )
         )
-        self.logger.info("save to csv -> {}".format(path))
+        self.logger.info(f"save to csv -> {path}")
 
-        cmd = 'sqlite3 -header -csv {db_path} "{sql};" > {path}'.format(
-            db_path=self.db_path, path=path, sql=sql
-        )
+        cmd = f'sqlite3 -header -csv {self.db_path} "{sql};" > {path}'
         run_shell(cmd)
         if pop:
             self.delete(condition)

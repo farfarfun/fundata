@@ -1,8 +1,9 @@
 import pandas as pd
 from farlog import getLogger
 
-from .datas import ElectronicsData
+from ..exceptions import DatasetNotFoundError
 from ..manage import DatasetManage
+from .datas import ElectronicsData
 
 logger = getLogger(__name__)
 
@@ -29,17 +30,33 @@ def get_movielens(dataset: DatasetManage | None = None) -> None:
     # os.system('cd ' + file_path(data.path) + ' && unzip ' + file_name(data.path))
 
 
-def get_adult_data(dataset: DatasetManage | None = None) -> None:
-    """下载并读取 Adult 数据集。"""
-    dataset = _get_dataset(dataset)
-    data_train = dataset.download("adult-train", overwrite=False)
-    data_test = dataset.download("adult-test", overwrite=False)
+def get_adult_data(
+    dataset: DatasetManage | None = None, path_root: str = "./download/"
+) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """下载并读取 Adult 数据集。
 
-    logger.info(f"adult-test 数据: {data_test}")
-    train_data = pd.read_table(data_train.path, header=None, delimiter=",")
+    :param dataset: 数据集索引管理器，不传则创建默认实例
+    :param path_root: 本地数据根目录
+    :return: ``(训练集, 测试集)`` 两个 DataFrame
+    :raises DatasetNotFoundError: ``adult-train``/``adult-test`` 不在索引中时抛出
+    """
+    dataset = _get_dataset(dataset)
+    train_path = dataset.download("adult-train", overwrite=False, path_root=path_root)
+    test_path = dataset.download("adult-test", overwrite=False, path_root=path_root)
+
+    if train_path is None or test_path is None:
+        raise DatasetNotFoundError(
+            "adult-train/adult-test 不在数据集索引中，请先执行 insert_library()"
+        )
+
+    train_data = pd.read_table(train_path, header=None, delimiter=",")
+    # UCI 原始 adult.test 第一行是 `|1x3 Cross validator` 注释行，不跳过的话 pandas
+    # 会按它推断出只有 1 列，再把后面 15 列的正常行全部当成坏行丢掉。
     test_data = pd.read_table(
-        data_test.path, header=None, delimiter=",", error_bad_lines=False
+        test_path, header=None, delimiter=",", comment="|", on_bad_lines="skip"
     )
+    logger.info(f"adult 数据: train={train_data.shape} test={test_data.shape}")
+    return train_data, test_data
 
     # all_columns = ['age', 'workclass', 'fnlwgt', 'education', 'education-num', 'marital-status', 'occupation',
     #                'relationship', 'race', 'sex', 'capital-gain', 'capital-loss', 'hours-per-week', 'native-country',

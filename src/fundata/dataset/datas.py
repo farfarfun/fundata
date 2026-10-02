@@ -43,7 +43,7 @@ class ElectronicsData(DataSet):
     """Amazon Electronics 数据集处理器。"""
 
     def __init__(self, *args: object, **kwargs: object) -> None:
-        super(ElectronicsData, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
         # 源文件
         self.json_meta = self.path_root + "/electronics/meta_Electronics.json"
@@ -86,7 +86,7 @@ class ElectronicsData(DataSet):
             return
 
         def to_df(file_path):
-            with open(file_path, "r") as fin:
+            with open(file_path) as fin:
                 df = {}
                 i = 0
                 for line in fin:
@@ -156,8 +156,8 @@ class ElectronicsData(DataSet):
             reviews_df.shape[0],
         )
         logger.info(
-            "user_count: %d\t item_count: %d\t cate_count: %d\t example_count: %d"
-            % (user_count, item_count, cate_count, example_count)
+            f"user_count: {user_count}\t item_count: {item_count}\t "
+            f"cate_count: {cate_count}\t example_count: {example_count}"
         )
 
         # 按物品id排序，并重置索引
@@ -277,7 +277,7 @@ class ElectronicsData(DataSet):
 
 class CriteoDataBak(DataSet):
     def __init__(self, *args: object, **kwargs: object) -> None:
-        super(CriteoDataBak, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle_train = self.path_root + "/criteo/train.txt"
@@ -438,7 +438,7 @@ class CriteoData(DataSet):
     """Criteo 数据集处理器。"""
 
     def __init__(self, *args: object, **kwargs: object) -> None:
-        super(CriteoData, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle_train = self.path_root + "/criteo/train.txt"

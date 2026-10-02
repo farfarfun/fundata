@@ -15,7 +15,7 @@ its lightweight public classes. Criteo processing remains guarded by the
 ``dataset`` extra and is tested separately in environments that install it.
 """
 
-import logging
+from pathlib import Path
 
 import pytest
 
@@ -176,7 +176,7 @@ def test_manage_lanzou_download_not_implemented(tmp_path):
     urls = json.dumps(json.dumps({"lanzou": "http://example.com/x"}))
     dataset.execute(
         "insert into datasets (name, category, path, urls) values "
-        "('demo', 'cat', 'demo.bin', '{}')".format(urls)
+        f"('demo', 'cat', 'demo.bin', '{urls}')"
     )
 
     with pytest.raises(NotImplementedError):
@@ -220,11 +220,14 @@ def test_dataset_helpers_accept_default_and_explicit_manager(
     from fundata.dataset import core
 
     class Manager:
+        """最小替身：与真实 ``DatasetManage.download`` 一样返回本地路径。"""
+
         def __init__(self):
             self.names = []
 
         def download(self, name, **kwargs):
             self.names.append(name)
+            return f"./download/{name}"
 
     default_manager = Manager()
     monkeypatch.setattr(core, "DatasetManage", lambda: default_manager)
@@ -237,34 +240,223 @@ def test_dataset_helpers_accept_default_and_explicit_manager(
     assert explicit_manager.names == expected_names
 
 
-def test_get_adult_data_accepts_default_and_explicit_manager(monkeypatch):
-    """Adult 入口支持两种管理器传入方式并读取两个下载结果。"""
-    from types import SimpleNamespace
+def _index_with_local_source(tmp_path, name, relative_path, payload):
+    """在临时索引里登记一条指向本地 file:// 直链的记录，返回管理器。
 
+    用真实的 ``DatasetManage`` 和真实的 ``urlopen``（file:// 协议），不打桩下载，
+    这样 ``download()`` 真的写文件、真的返回路径。
+    """
+    from fundata.manage.core import DatasetManage
+
+    source = tmp_path / f"{name}.source"
+    source.write_text(payload, encoding="utf-8")
+
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    dataset.insert(
+        {
+            "name": name,
+            "category": "dataset",
+            "urls": {"source": source.as_uri()},
+            "path": relative_path,
+        }
+    )
+    return dataset
+
+
+def test_download_source_url_writes_file_and_returns_path(tmp_path):
+    """直链记录会真的把内容写到本地，并返回本地路径。"""
+    dataset = _index_with_local_source(tmp_path, "demo", "sub/demo.txt", "hello\n")
+    try:
+        target = dataset.download("demo", path_root=str(tmp_path / "download"))
+        assert target == str(tmp_path / "download" / "sub" / "demo.txt")
+        assert Path(target).read_text(encoding="utf-8") == "hello\n"
+        # 临时文件不残留
+        assert not Path(target + ".part").exists()
+    finally:
+        dataset.close()
+
+
+def test_download_skips_existing_file_when_not_overwrite(tmp_path):
+    """overwrite=False 且本地已存在时不重新拉取，内容保持不变。"""
+    dataset = _index_with_local_source(tmp_path, "demo", "demo.txt", "new\n")
+    try:
+        root = tmp_path / "download"
+        target = root / "demo.txt"
+        target.parent.mkdir(parents=True)
+        target.write_text("old\n", encoding="utf-8")
+
+        assert dataset.download("demo", overwrite=False, path_root=str(root)) == str(
+            target
+        )
+        assert target.read_text(encoding="utf-8") == "old\n"
+
+        assert dataset.download("demo", overwrite=True, path_root=str(root)) == str(
+            target
+        )
+        assert target.read_text(encoding="utf-8") == "new\n"
+    finally:
+        dataset.close()
+
+
+def test_download_unknown_dataset_returns_none(tmp_path):
+    """索引里没有的名字返回 None，而不是假装成功。"""
+    dataset = _index_with_local_source(tmp_path, "demo", "demo.txt", "x")
+    try:
+        assert dataset.download("not-in-index", path_root=str(tmp_path)) is None
+    finally:
+        dataset.close()
+
+
+def test_download_without_usable_url_raises(tmp_path):
+    """既没有直链也没有蓝奏云地址时报错，不返回成功。"""
+    from fundata.exceptions import DatasetDownloadError
+    from fundata.manage.core import DatasetManage
+
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    dataset.insert({"name": "demo", "urls": {"other": "x"}, "path": "demo.txt"})
+    try:
+        with pytest.raises(DatasetDownloadError):
+            dataset.download("demo", path_root=str(tmp_path))
+    finally:
+        dataset.close()
+
+
+def test_download_broken_source_raises_and_cleans_temp(tmp_path):
+    """直链不可达时抛领域异常，并且不留下半截文件。"""
+    from fundata.exceptions import DatasetDownloadError
+    from fundata.manage.core import DatasetManage
+
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    missing = tmp_path / "nope.bin"
+    dataset.insert(
+        {"name": "demo", "urls": {"source": missing.as_uri()}, "path": "demo.bin"}
+    )
+    root = tmp_path / "download"
+    try:
+        with pytest.raises(DatasetDownloadError):
+            dataset.download("demo", path_root=str(root))
+        assert not (root / "demo.bin").exists()
+        assert not (root / "demo.bin.part").exists()
+    finally:
+        dataset.close()
+
+
+def test_encode_does_not_mutate_input_and_decode_round_trips(tmp_path):
+    """encode 不改入参，insert+update 之后 urls 仍然只编码了一层。"""
+    from fundata.manage.core import DatasetManage
+
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    record = {"name": "demo", "urls": {"source": "http://a"}, "path": "demo.bin"}
+    try:
+        dataset.insert(record)
+        dataset.update(record)
+        assert record["urls"] == {"source": "http://a"}, "encode 不应原地修改入参"
+
+        raw = dataset.select("select * from table_name")[0]
+        assert dataset.decode(raw)["urls"] == {"source": "http://a"}
+    finally:
+        dataset.close()
+
+
+def test_decode_tolerates_legacy_double_encoded_urls(tmp_path):
+    """旧库里被编码两层的 urls 仍然能解码出字典。"""
+    import json
+
+    from fundata.manage.core import DatasetManage
+
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    try:
+        legacy = json.dumps(json.dumps({"source": "http://a"}))
+        assert dataset.decode({"urls": legacy})["urls"] == {"source": "http://a"}
+    finally:
+        dataset.close()
+
+
+def test_get_adult_data_reads_both_downloaded_files(tmp_path):
+    """Adult 入口真的读到下载下来的两个文件，并返回两个 DataFrame。"""
     from fundata.dataset import core
+    from fundata.manage.core import DatasetManage
 
-    class Manager:
-        def __init__(self):
-            self.names = []
+    train_src = tmp_path / "train.csv"
+    train_src.write_text("1,a\n2,b\n", encoding="utf-8")
+    test_src = tmp_path / "test.csv"
+    # 还原 UCI adult.test 的形状：第一行是 `|...` 注释行（必须被 comment="|" 跳过），
+    # 最后一行多一列（必须被 on_bad_lines="skip" 跳过）
+    test_src.write_text("|1x3 Cross validator\n3,c\n4,d\n5,e,extra\n", encoding="utf-8")
 
-        def download(self, name, **kwargs):
-            self.names.append(name)
-            return SimpleNamespace(path=f"/{name}.csv")
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    dataset.insert(
+        {
+            "name": "adult-train",
+            "urls": {"source": train_src.as_uri()},
+            "path": "adult-data/adult.train.txt",
+        }
+    )
+    dataset.insert(
+        {
+            "name": "adult-test",
+            "urls": {"source": test_src.as_uri()},
+            "path": "adult-data/adult.test.txt",
+        }
+    )
+    try:
+        train_data, test_data = core.get_adult_data(
+            dataset, path_root=str(tmp_path / "download")
+        )
+        assert train_data.shape == (2, 2)
+        assert test_data.shape == (2, 2)
+        assert (tmp_path / "download" / "adult-data" / "adult.train.txt").exists()
+    finally:
+        dataset.close()
 
-    read_paths = []
-    monkeypatch.setattr(core.pd, "read_table", lambda path, **kwargs: read_paths.append(path))
-    default_manager = Manager()
-    monkeypatch.setattr(core, "DatasetManage", lambda: default_manager)
 
-    core.get_adult_data()
-    explicit_manager = Manager()
-    core.get_adult_data(explicit_manager)
+def test_get_adult_data_missing_index_raises(tmp_path):
+    """索引里没有 adult 记录时抛 DatasetNotFoundError，而不是 AttributeError。"""
+    from fundata.dataset import core
+    from fundata.exceptions import DatasetNotFoundError
+    from fundata.manage.core import DatasetManage
 
-    assert default_manager.names == ["adult-train", "adult-test"]
-    assert explicit_manager.names == ["adult-train", "adult-test"]
-    assert read_paths == [
-        "/adult-train.csv",
-        "/adult-test.csv",
-        "/adult-train.csv",
-        "/adult-test.csv",
-    ]
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    try:
+        with pytest.raises(DatasetNotFoundError):
+            core.get_adult_data(dataset, path_root=str(tmp_path / "download"))
+    finally:
+        dataset.close()
+
+
+def test_to_csv_accepts_dict_condition(tmp_path):
+    """字典条件导出 csv 时必须生成合法 SQL，只导出匹配的行。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "csv.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "alice"})
+        table.insert({"id": "2", "name": "bob"})
+
+        out = table.to_csv({"id": "1"}, path=str(tmp_path / "out.csv"))
+        content = Path(out).read_text(encoding="utf-8")
+        assert "alice" in content
+        assert "bob" not in content
+    finally:
+        table.close()
+
+
+def test_sqlite_table_accepts_bare_filename(tmp_path, monkeypatch):
+    """db_path 不带目录时不能因为 makedirs('') 崩掉。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    monkeypatch.chdir(tmp_path)
+    table = SqliteTable(db_path="bare.db", table_name="demo", columns=["id"])
+    try:
+        assert (tmp_path / "bare.db").exists()
+    finally:
+        table.close()

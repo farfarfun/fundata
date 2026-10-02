@@ -1,8 +1,8 @@
 # fundata
 
-一批用于下载/管理机器学习常见公开数据集的脚本：数据集的名称、分类、下载地址等元信息存入本地 SQLite（`fundata.manage.core.DatasetManage`），实际数据文件从蓝奏网盘下载。收录的数据集包括 iris、MovieLens（100k/1m/10m/20m/25m）、Criteo（sample/kaggle）、Amazon Electronics 评论、adult、porto-seguro、bitly-usagov、COCO（val2017/annotations）以及 YOLOv3/v4 权重等。
+一批用于下载/管理机器学习常见公开数据集的脚本：数据集的名称、分类、下载地址等元信息存入本地 SQLite（`fundata.manage.core.DatasetManage`），再按索引里的地址把数据文件拉到本地。收录的数据集包括 iris、MovieLens（100k/1m/10m/20m/25m）、Criteo（sample/kaggle）、Amazon Electronics 评论、adult、porto-seguro、bitly-usagov、COCO（val2017/annotations）以及 YOLOv3/v4 权重等。
 
-`fundata.work`、`fundata.manage`、`fundata.tables_bak` 可以正常 import 和使用。`DatasetManage.download()` 中蓝奏云下载分支会抛出 `NotImplementedError`：当前 `fundrive` 的蓝奏云 API 是基于类的 `fundrive.drives.lanzou.LanZouDrive`，需要已认证的实例，没有免认证的下载函数可用。
+`fundata.work`、`fundata.manage`、`fundata.tables_bak` 可以正常 import 和使用。`DatasetManage.download()` 优先走记录里的 `source` 直链；只有 `lanzou` 地址的记录会抛出 `NotImplementedError`：当前 `fundrive` 的蓝奏云 API 是基于类的 `fundrive.drives.lanzou.LanZouDrive`，需要已认证的实例，没有免认证的下载函数可用。
 
 `fundata.dataset` 可以在不安装重型机器学习依赖时导入；构建 Criteo 数据集时才需要安装 `dataset` extra。`tensorflow`、`keras`、`scikit-learn`、`funkeras`（提供 `notekeras`）已收录进 `pyproject.toml` 的 `dataset` extra，默认不随主依赖安装。
 
@@ -22,14 +22,16 @@ pip install fundata
 pip install "fundata[dataset]"
 ```
 
-基础包支持 Python 3.10；`dataset` extra 的机器学习依赖需要 Python 3.11 或更高版本，
-以确保安装包含安全修复的 Keras 版本。
+基础包支持 Python 3.10。`dataset` extra 里 TensorFlow/Keras 这条链路带
+`python_version >= '3.11'` 标记，只在 Python 3.11+ 上安装：keras 从 3.13 起才要求
+Python 3.11，在 3.10 上能解析到的最高版本仍落在 Keras 安全公告的受影响区间内。
+`scikit-learn` 与 Keras 无关，在 3.10 上照常安装。
 
 `pyproject.toml` 中已声明的 `dependencies` 为 `numpy`、`pandas`、`funshell`、`farlog`、`tqdm`，安装后 `fundata`（顶层）、`fundata.work`、`fundata.manage`、`fundata.tables_bak`、`fundata.dataset` 均可正常导入。构建 Criteo 数据集时需要额外安装 `dataset` extra。
 
 ## 用法示例
 
-创建并查询本地数据集索引：
+建立本地索引，然后按名称下载：
 
 ```python
 from fundata.manage.core import DatasetManage
@@ -38,12 +40,14 @@ from fundata.manage.library import insert_library
 dataset = DatasetManage(db_path="./fundata.db")
 dataset.create()
 insert_library(dataset)  # 把内置下载地址写入当前目录的 sqlite 索引
-records = dataset.select(condition={"name": "movielens-100k"})
-print(records[0]["urls"])
+
+# download() 返回本地文件路径；数据集不在索引里时返回 None
+path = dataset.download("adult-train", overwrite=False, path_root="./download/")
+print(path)  # ./download/adult-data/adult.train.txt
 ```
 
-索引中的蓝奏云地址目前不能直接下载：`DatasetManage.download()` 遇到此类记录会抛出
-`NotImplementedError`，需先接入已认证的 `fundrive.drives.lanzou.LanZouDrive` 实例。
+只登记了蓝奏云地址的记录（例如 `yolov3.weights`）目前下载不了：`DatasetManage.download()`
+会抛出 `NotImplementedError`，需先接入已认证的 `fundrive.drives.lanzou.LanZouDrive` 实例。
 
 管理数据落盘目录（数据库/日志/公共文件），默认落在 `/opt/farfarfun/apps/fundata`：
 

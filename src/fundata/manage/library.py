@@ -1,5 +1,3 @@
-import json
-
 from farlog import getLogger
 from tqdm import tqdm
 
@@ -14,13 +12,17 @@ def check() -> None:
     dataset.create()
 
     data = dataset.select_all()
-    d1 = json.loads(json.loads(data[0][3]))
-    logger.info(f"urls={d1}")
-    logger.info(f"source={d1['source']}")
+    urls = dataset.decode(data[0])["urls"]
+    logger.info(f"urls={urls}")
+    logger.info(f"source={urls.get('source')}")
 
 
 def insert_library(dataset: DatasetManage | None = None) -> None:
-    """将内置的公开数据集元信息写入指定或默认数据集索引。"""
+    """将内置的公开数据集元信息写入指定或默认数据集索引。
+
+    :param dataset: 目标索引管理器，不传则写入默认 sqlite 索引
+    :return: 无
+    """
     lines = []
     # iris
     lines.extend(

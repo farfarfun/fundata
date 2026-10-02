@@ -2,6 +2,7 @@ import os
 
 from farlog import getLogger
 from funshell import run_shell_list
+
 from fundata.manage import DatasetManage, insert_library
 
 logger = getLogger(__name__)
@@ -39,7 +40,7 @@ def run2():
         )
         lines.append(line)
 
-    text = open("README.md", "r").read()
+    text = open("README.md").read()
     text = text.replace("$dataset_table$", "\n".join(lines))
     open("../README.md", "w").write(text)
 

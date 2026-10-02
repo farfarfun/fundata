@@ -1,5 +1,6 @@
-from fundata.dataset import CriteoData, ElectronicsData
 from farlog import getLogger
+
+from fundata.dataset import CriteoData, ElectronicsData
 
 logger = getLogger(__name__)
 
