@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
-authors = [{ name = "牛哥", email = "farfarfun@qq.com" }]
 dependencies = [
     "numpy>=1.24",
     "pandas>=2.0",
@@ -15,6 +14,13 @@ dependencies = [
     "tqdm>=4.60",
 ]
 
+[[project.authors]]
+name = "牛哥"
+email = "niuliangtao@qq.com"
+
+[[project.authors]]
+name = "farfarfun"
+email = "farfarfun@qq.com"
 [project.optional-dependencies]
 # fundata.dataset 下的具体数据集处理类（ElectronicsData/CriteoData 等）依赖的重型 ML 库，
 # 主依赖不默认安装，按需通过 `pip install fundata[dataset]` 引入。
@@ -29,6 +35,18 @@ dataset = [
     "funkeras>=0.8; python_version >= '3.11'",
 ]
 
+[[project.maintainers]]
+name = "牛哥"
+email = "niuliangtao@qq.com"
+
+[[project.maintainers]]
+name = "farfarfun"
+email = "farfarfun@qq.com"
+
+[project.urls]
+Organization = "https://github.com/farfarfun"
+Repository = "https://github.com/farfarfun/fundata"
+Releases = "https://github.com/farfarfun/fundata/releases"
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
