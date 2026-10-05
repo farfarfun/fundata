@@ -22,3 +22,7 @@ class DatasetNotFoundError(FunDataError):
 
 class DatasetDownloadError(FunDataError):
     """数据集下载失败，或记录里没有可用的下载地址。"""
+
+
+class DatasetBuildError(FunDataError):
+    """数据集构建结果不符合预期，例如切分出的样本数与统计值对不上。"""

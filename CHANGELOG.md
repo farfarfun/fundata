@@ -9,8 +9,18 @@
 - **SQL 注入**：`DatasetManage.download()` 把调用方传入的 `name` 直接拼进 `where name='{name}'`；`BaseTable._properties2kv()`/`_condition2equal()` 也把所有字段值拼进 SQL 字符串（前者只是粗暴地把 `'` 删掉，后者连删都没删）。现在字段值一律走 sqlite 的 `?` 参数绑定；表名、字段名这类无法参数化的标识符在 `BaseTable.__init__()` 就用白名单 `[A-Za-z_][A-Za-z0-9_]*` 校验，非法标识符直接抛 `TableConfigError`。
 - **Shell 注入**：`SqliteTable.to_csv()` 原先拼 `sqlite3 -header -csv {db_path} "{sql};" > {path}` 再丢给 `run_shell()`，`db_path`、where 条件、输出路径任意一个带空格或 shell 元字符都会被解释执行（而且依赖机器上装了 `sqlite3` 可执行文件）。改为直接用已有连接 `pd.read_sql()` + `DataFrame.to_csv(index=False)`，输出格式与原先的 `-header -csv` 一致，`tables_bak` 不再调用任何 shell。
 
+- **`fundata.work.log_file()` 返回的是数据库文件名**：模块级函数的默认参数写成了 `file_name="data.db"`，而 `WorkApp.log_file()` 的默认值和 README 都是 `info.log`，调用方不传文件名时拿到 `logs/data.db`。改为 `info.log`，并加测试断言模块级与实例级默认值一致。
+- **`ElectronicsData` 的 `overwrite` 参数形同虚设**：`convert_pd_1()`/`remap_id_2()`/`build_dataset_3()` 都只看目标文件在不在，在就直接 return，完全无视 `overwrite`，`init_data(overwrite=True)` 根本不会重算。
+- **生产代码用 `assert` 校验业务状态**：`build_dataset_3()` 里的 `assert len(test_set) == user_count` 在 `python -O` 下会被整条删掉，校验静默失效。改为显式抛新增的 `DatasetBuildError`，并带上数据集上下文。
+
+### 新增
+
+- `src/fundata/exceptions.py` 新增 `DatasetBuildError`。
+- `ElectronicsData.convert_pd_1()` / `remap_id_2()` / `build_dataset_3()` 与 `CriteoDataBak` 类补齐中文 docstring，说明用途、参数、产出文件和可能抛出的异常。
+
 ### 变更
 
+- GitHub 仓库 description 去掉「转存网盘加速国内下载」——只登记蓝奏云地址的记录目前仍抛 `NotImplementedError`，这项能力并不存在。
 - `BaseTable.execute()` / `SqliteTable.execute()` / `select_pd()` / `select()` 新增 `params` 形参，用于下发绑定参数。
 - `BaseTable._properties2kv()` 返回 `(字段名, 原始值)` 而不再是 `(字段名, 带引号的 SQL 字面量)`；`_condition2equal()` / `_where_clause()` 返回 `(子句, 参数列表)`。均为内部方法。
 - 字段值不再被 `str()` 强转、也不再被静默删掉单引号，按原始类型入库；`O'Brien` 这类值现在能原样存取。

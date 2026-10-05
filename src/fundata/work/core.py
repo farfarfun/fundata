@@ -41,10 +41,22 @@ class WorkApp:
 
 
 def db_file(app_name: str = "fundata", file_name: str = "data.db") -> str:
-    """返回应用数据库文件路径。"""
+    """返回应用数据库文件路径。
+
+    :param app_name: 应用名，决定默认的应用目录
+    :param file_name: 数据库文件名
+    :return: ``<应用目录>/databases/<file_name>``
+    """
     return WorkApp(app_name=app_name).db_file(file_name)
 
 
-def log_file(app_name: str = "fundata", file_name: str = "data.db") -> str:
-    """返回应用日志文件路径。"""
+def log_file(app_name: str = "fundata", file_name: str = "info.log") -> str:
+    """返回应用日志文件路径。
+
+    默认文件名与 :meth:`WorkApp.log_file` 保持一致（``info.log``）。
+
+    :param app_name: 应用名，决定默认的应用目录
+    :param file_name: 日志文件名
+    :return: ``<应用目录>/logs/<file_name>``
+    """
     return WorkApp(app_name=app_name).log_file(file_name)

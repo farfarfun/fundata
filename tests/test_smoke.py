@@ -57,6 +57,102 @@ def test_work_app_smoke():
     )
 
 
+def test_module_level_log_file_default_matches_class_api():
+    """模块级 log_file() 的默认文件名必须和 WorkApp.log_file() 一致，都是 info.log。"""
+    import inspect
+
+    import fundata.work as work
+
+    assert (
+        inspect.signature(work.log_file).parameters["file_name"].default
+        == inspect.signature(work.WorkApp.log_file).parameters["file_name"].default
+        == "info.log"
+    )
+    assert work.log_file(app_name="smoke-test-app").endswith("logs/info.log")
+    assert work.db_file(app_name="smoke-test-app").endswith("databases/data.db")
+
+
+def test_build_dataset_3_raises_instead_of_asserting(tmp_path):
+    """切分结果对不上时抛领域异常，而不是用 assert（python -O 下会被整条删掉）。"""
+    import inspect
+    import pickle
+
+    import pandas as pd
+
+    from fundata.dataset.datas import ElectronicsData
+    from fundata.exceptions import DatasetBuildError
+
+    source = inspect.getsource(ElectronicsData.build_dataset_3)
+    # 去掉注释行再判断，正文里解释「为什么不能用 assert」的那句注释不算数
+    code = "\n".join(
+        line for line in source.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert "assert " not in code
+
+    data = ElectronicsData(data_path=str(tmp_path))
+    reviews = pd.DataFrame(
+        {"reviewerID": [0, 0, 0], "asin": [1, 2, 3], "unixReviewTime": [1, 2, 3]}
+    )
+    Path(data.pkl_remap).parent.mkdir(parents=True, exist_ok=True)
+    with open(data.pkl_remap, "wb") as handle:
+        pickle.dump(reviews, handle)
+        pickle.dump([0, 0, 0, 0], handle)
+        # user_count 故意写成 99，与实际只有 1 个用户对不上
+        pickle.dump((99, 4, 1, 3), handle)
+
+    with pytest.raises(DatasetBuildError):
+        data.build_dataset_3()
+
+
+def test_public_dataset_methods_have_chinese_docstrings():
+    """ElectronicsData 的公开处理步骤和 CriteoDataBak 类都必须有中文 docstring。"""
+    from fundata.dataset.datas import CriteoDataBak, ElectronicsData
+
+    targets = [
+        ElectronicsData.convert_pd_1,
+        ElectronicsData.remap_id_2,
+        ElectronicsData.build_dataset_3,
+        CriteoDataBak,
+    ]
+    for target in targets:
+        doc = (target.__doc__ or "").strip()
+        assert doc, f"{target.__qualname__} 缺少 docstring"
+        assert any("一" <= ch <= "鿿" for ch in doc), (
+            f"{target.__qualname__} 的 docstring 不是中文"
+        )
+
+
+def test_preprocess_steps_respect_overwrite(tmp_path):
+    """overwrite=True 必须真的重算，而不是因为目标文件已存在就直接跳过。"""
+    import pickle
+
+    import pandas as pd
+
+    from fundata.dataset.datas import ElectronicsData
+
+    data = ElectronicsData(data_path=str(tmp_path))
+    Path(data.pkl_remap).parent.mkdir(parents=True, exist_ok=True)
+
+    # 先放一份"旧结果"占位
+    Path(data.pkl_dataset).write_bytes(b"stale")
+
+    reviews = pd.DataFrame(
+        {"reviewerID": [0, 0, 0], "asin": [1, 2, 3], "unixReviewTime": [1, 2, 3]}
+    )
+    with open(data.pkl_remap, "wb") as handle:
+        pickle.dump(reviews, handle)
+        pickle.dump([0, 0, 0, 0], handle)
+        pickle.dump((1, 4, 1, 3), handle)
+
+    # overwrite=False：保持旧内容不动
+    data.build_dataset_3(overwrite=False)
+    assert Path(data.pkl_dataset).read_bytes() == b"stale"
+
+    # overwrite=True：重新生成
+    data.build_dataset_3(overwrite=True)
+    assert Path(data.pkl_dataset).read_bytes() != b"stale"
+
+
 def test_tables_bak_base_table_smoke():
     """fundata.tables_bak.BaseTable: pure SQL-string-building logic."""
     from fundata.tables_bak.core import BaseTable

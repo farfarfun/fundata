@@ -10,6 +10,7 @@ from farlog import getLogger
 from funshell import run_shell_list
 
 from .._util import exists_file
+from ..exceptions import DatasetBuildError
 from ..manage import DatasetManage
 
 logger = getLogger(__name__)
@@ -80,9 +81,20 @@ class ElectronicsData(DataSet):
         logger.info("unzip done")
 
     def convert_pd_1(self, overwrite: bool = False) -> None:
-        if exists_file(self.pkl_reviews, mkdir=True) and exists_file(
-            self.pkl_meta, mkdir=True
-        ):
+        """把两份原始 json 转成 pandas DataFrame 并落成 pkl。
+
+        读取 ``self.json_reviews`` / ``self.json_meta``（``download_raw_0()`` 解压出来的
+        逐行 json 文本），meta 只保留在 reviews 里出现过的 ``asin``，分别写入
+        ``self.pkl_reviews`` 与 ``self.pkl_meta``。
+
+        :param overwrite: 两份 pkl 都已存在时是否重新生成；``False`` 则直接跳过
+        :return: 无返回值，结果写入 ``self.pkl_reviews`` 和 ``self.pkl_meta``
+        :raises FileNotFoundError: 原始 json 还没下载解压
+        """
+        # 两个 exists_file 都要调用：它们带 mkdir=True 的副作用，负责建出父目录。
+        reviews_done = exists_file(self.pkl_reviews, mkdir=True)
+        meta_done = exists_file(self.pkl_meta, mkdir=True)
+        if reviews_done and meta_done and not overwrite:
             return
 
         def to_df(file_path):
@@ -106,8 +118,21 @@ class ElectronicsData(DataSet):
             pickle.dump(meta_df, f, pickle.HIGHEST_PROTOCOL)
 
     def remap_id_2(self, overwrite: bool = False) -> None:
+        """把用户 ID、物品 ID、类目重新映射成连续整数，并落成 pkl。
+
+        读取 ``convert_pd_1()`` 产出的两份 pkl，按字典序给 ``reviewerID``、``asin``、
+        ``categories`` 各建一张「原值 → 序号」映射表，替换成序号后按
+        (用户, 浏览时间) 排序，写入 ``self.pkl_remap``。该文件依次 pickle 了四个对象：
+        评论 DataFrame、物品类目数组 ``cate_list``、
+        ``(user_count, item_count, cate_count, example_count)`` 四元组，
+        以及 ``(asin_key, cate_key, view_key)`` 三张反查表。
+
+        :param overwrite: ``self.pkl_remap`` 已存在时是否重新生成；``False`` 则直接跳过
+        :return: 无返回值，结果写入 ``self.pkl_remap``
+        :raises FileNotFoundError: ``convert_pd_1()`` 还没执行过
+        """
         random.seed(1234)
-        if exists_file(self.pkl_remap, mkdir=True):
+        if exists_file(self.pkl_remap, mkdir=True) and not overwrite:
             return
 
         # reviews
@@ -187,8 +212,20 @@ class ElectronicsData(DataSet):
             pickle.dump((asin_key, cate_key, view_key), f, pickle.HIGHEST_PROTOCOL)
 
     def build_dataset_3(self, overwrite: bool = False) -> None:
+        """按留一法切分训练集/测试集并落成 pkl。
+
+        读取 ``remap_id_2()`` 产出的 ``self.pkl_remap``，对每个用户按时间排好的浏览序列：
+        前 n-1 次（从第 2 次开始）作为训练样本（每条正样本配一条等量负样本），
+        最后一次作为测试样本。结果写入 ``self.pkl_dataset``，依次 pickle 了
+        训练集、测试集、``cate_list`` 和 ``(user_count, item_count, cate_count, max_sl)``。
+
+        :param overwrite: ``self.pkl_dataset`` 已存在时是否重新生成；``False`` 则直接跳过
+        :return: 无返回值，结果写入 ``self.pkl_dataset``
+        :raises FileNotFoundError: ``remap_id_2()`` 还没执行过
+        :raises DatasetBuildError: 测试集样本数与用户数对不上，说明上游数据或切分逻辑有问题
+        """
         random.seed(1234)
-        if exists_file(self.pkl_dataset, mkdir=True):
+        if exists_file(self.pkl_dataset, mkdir=True) and not overwrite:
             return
 
         with open(self.pkl_remap, "rb") as f:
@@ -236,7 +273,13 @@ class ElectronicsData(DataSet):
         random.shuffle(train_set)
         random.shuffle(test_set)
 
-        assert len(test_set) == user_count
+        # 每个用户恰好贡献一条测试样本，对不上说明上游 remap 结果不完整。
+        # 这里不能用 assert：python -O 会把 assert 整条删掉，校验静默失效。
+        if len(test_set) != user_count:
+            raise DatasetBuildError(
+                f"测试集样本数与用户数不一致: test_set={len(test_set)} user_count={user_count}，"
+                f"请检查 {self.pkl_remap} 是否完整"
+            )
 
         # 写入dataset.pkl文件
         with open(self.pkl_dataset, "wb") as f:
@@ -276,7 +319,16 @@ class ElectronicsData(DataSet):
 
 
 class CriteoDataBak(DataSet):
+    """Criteo 数据集处理器的旧版实现（纯 sklearn，不依赖 TensorFlow）。
+
+    与 :class:`CriteoData` 的区别：这里只用 ``scikit-learn`` 做 LabelEncoder /
+    MinMaxScaler / train_test_split，返回 numpy 数组；``CriteoData`` 则依赖
+    ``tensorflow`` 与 ``notekeras``，返回 ``tf.data.Dataset`` 和特征层配置。
+    保留本类是为了在只装了 ``scikit-learn`` 的环境下也能跑通 Criteo 链路。
+    """
+
     def __init__(self, *args: object, **kwargs: object) -> None:
+        """初始化旧版 Criteo 数据集处理器，确定各原始文件路径。"""
         super().__init__(*args, **kwargs)
         self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
