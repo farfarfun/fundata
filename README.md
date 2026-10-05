@@ -49,6 +49,10 @@ print(path)  # ./download/adult-data/adult.train.txt
 只登记了蓝奏云地址的记录（例如 `yolov3.weights`）目前下载不了：`DatasetManage.download()`
 会抛出 `NotImplementedError`，需先接入已认证的 `fundrive.drives.lanzou.LanZouDrive` 实例。
 
+不传 `db_path` 时，索引库路径按 `FUNDATA_INDEX_DB` 环境变量 → 包目录下的 `dataset.db`
+（仅当该目录可写）→ `~/.fundata/dataset.db` 的顺序解析。`pip install` 之后包目录通常在
+site-packages 里且不可写，此时会自动落到用户目录，不会因为建库失败而报错。
+
 管理数据落盘目录（数据库/日志/公共文件），默认落在 `/opt/farfarfun/apps/fundata`：
 
 ```python

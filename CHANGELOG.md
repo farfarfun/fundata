@@ -13,9 +13,12 @@
 - **`ElectronicsData` 的 `overwrite` 参数形同虚设**：`convert_pd_1()`/`remap_id_2()`/`build_dataset_3()` 都只看目标文件在不在，在就直接 return，完全无视 `overwrite`，`init_data(overwrite=True)` 根本不会重算。
 - **生产代码用 `assert` 校验业务状态**：`build_dataset_3()` 里的 `assert len(test_set) == user_count` 在 `python -O` 下会被整条删掉，校验静默失效。改为显式抛新增的 `DatasetBuildError`，并带上数据集上下文。
 
+- **默认索引库建在 site-packages 里**：`DatasetManage()` 不传 `db_path` 时固定用包目录下的 `dataset.db`，`pip install` 之后那是只读的 site-packages，普通用户一调用就 `OperationalError`。新增 `fundata.manage.default_db_path()`，按 `FUNDATA_INDEX_DB` → 包目录（可写才用）→ `~/.fundata/dataset.db` 解析。
+
 ### 新增
 
 - `src/fundata/exceptions.py` 新增 `DatasetBuildError`。
+- `fundata.manage.default_db_path()`，并从 `fundata.manage` 重导出。
 - `ElectronicsData.convert_pd_1()` / `remap_id_2()` / `build_dataset_3()` 与 `CriteoDataBak` 类补齐中文 docstring，说明用途、参数、产出文件和可能抛出的异常。
 
 ### 变更

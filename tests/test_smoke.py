@@ -57,6 +57,37 @@ def test_work_app_smoke():
     )
 
 
+def test_default_db_path_falls_back_when_package_dir_unwritable(tmp_path, monkeypatch):
+    """包目录不可写时（pip 装进 site-packages 的常态）回落到用户目录，而不是直接报错。"""
+    from fundata.manage import core as manage_core
+
+    monkeypatch.delenv("FUNDATA_INDEX_DB", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+
+    real_access = manage_core.os.access
+    package_dir = str(Path(manage_core.__file__).parent)
+
+    def fake_access(path, mode):
+        if str(path) == package_dir:
+            return False
+        return real_access(path, mode)
+
+    monkeypatch.setattr(manage_core.os, "access", fake_access)
+    monkeypatch.setattr(manage_core.os.path, "exists", lambda p: False)
+
+    assert manage_core.default_db_path() == str(
+        tmp_path / "home" / ".fundata" / "dataset.db"
+    )
+
+
+def test_default_db_path_honours_env_override(tmp_path, monkeypatch):
+    """FUNDATA_INDEX_DB 显式指定时优先生效。"""
+    from fundata.manage import default_db_path
+
+    monkeypatch.setenv("FUNDATA_INDEX_DB", str(tmp_path / "custom" / "idx.db"))
+    assert default_db_path() == str(tmp_path / "custom" / "idx.db")
+
+
 def test_module_level_log_file_default_matches_class_api():
     """模块级 log_file() 的默认文件名必须和 WorkApp.log_file() 一致，都是 info.log。"""
     import inspect

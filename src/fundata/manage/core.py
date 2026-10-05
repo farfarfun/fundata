@@ -12,6 +12,27 @@ from ..tables_bak.core import SqliteTable
 logger = getLogger(__name__)
 
 
+def default_db_path() -> str:
+    """返回默认的索引 sqlite 文件路径。
+
+    按 ``FUNDATA_INDEX_DB`` 环境变量 → 包目录下的 ``dataset.db``（仅当该目录可写时）
+    → ``~/.fundata/dataset.db`` 的顺序解析。``pip install`` 之后包目录通常位于
+    site-packages，普通用户没有写权限，直接往那里建库会 ``OperationalError``。
+
+    :return: sqlite 文件的绝对路径
+    """
+    explicit = os.environ.get("FUNDATA_INDEX_DB")
+    if explicit:
+        return os.path.abspath(os.path.expanduser(explicit))
+
+    package_dir = os.path.abspath(os.path.dirname(__file__))
+    package_db = os.path.join(package_dir, "dataset.db")
+    if os.path.exists(package_db) or os.access(package_dir, os.W_OK):
+        return package_db
+
+    return os.path.join(os.path.expanduser("~"), ".fundata", "dataset.db")
+
+
 class DatasetManage(SqliteTable):
     """管理数据集索引和下载信息。"""
 
@@ -21,11 +42,11 @@ class DatasetManage(SqliteTable):
         """初始化数据集索引。
 
         :param table_name: 索引表名
-        :param db_path: sqlite 文件路径，不传则落在包目录下的 ``dataset.db``
+        :param db_path: sqlite 文件路径，不传则按 :func:`default_db_path` 解析
         :param kwargs: 透传给 ``SqliteTable`` 的其余关键字参数
         """
         if db_path is None:
-            db_path = os.path.abspath(os.path.dirname(__file__)) + "/dataset.db"
+            db_path = default_db_path()
 
         super().__init__(db_path=db_path, table_name=table_name, **kwargs)
         self.columns = ["name", "category", "describe", "urls", "md5", "path", "size"]
