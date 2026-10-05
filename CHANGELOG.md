@@ -2,6 +2,19 @@
 
 本项目的版本记录按版本倒序排列，每个版本分「新增」「修复」「变更」「废弃」四类。
 
+## [未发布]
+
+### 修复
+
+- **SQL 注入**：`DatasetManage.download()` 把调用方传入的 `name` 直接拼进 `where name='{name}'`；`BaseTable._properties2kv()`/`_condition2equal()` 也把所有字段值拼进 SQL 字符串（前者只是粗暴地把 `'` 删掉，后者连删都没删）。现在字段值一律走 sqlite 的 `?` 参数绑定；表名、字段名这类无法参数化的标识符在 `BaseTable.__init__()` 就用白名单 `[A-Za-z_][A-Za-z0-9_]*` 校验，非法标识符直接抛 `TableConfigError`。
+- **Shell 注入**：`SqliteTable.to_csv()` 原先拼 `sqlite3 -header -csv {db_path} "{sql};" > {path}` 再丢给 `run_shell()`，`db_path`、where 条件、输出路径任意一个带空格或 shell 元字符都会被解释执行（而且依赖机器上装了 `sqlite3` 可执行文件）。改为直接用已有连接 `pd.read_sql()` + `DataFrame.to_csv(index=False)`，输出格式与原先的 `-header -csv` 一致，`tables_bak` 不再调用任何 shell。
+
+### 变更
+
+- `BaseTable.execute()` / `SqliteTable.execute()` / `select_pd()` / `select()` 新增 `params` 形参，用于下发绑定参数。
+- `BaseTable._properties2kv()` 返回 `(字段名, 原始值)` 而不再是 `(字段名, 带引号的 SQL 字面量)`；`_condition2equal()` / `_where_clause()` 返回 `(子句, 参数列表)`。均为内部方法。
+- 字段值不再被 `str()` 强转、也不再被静默删掉单引号，按原始类型入库；`O'Brien` 这类值现在能原样存取。
+
 ## [1.0.5]
 
 ### 新增

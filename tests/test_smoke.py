@@ -65,14 +65,20 @@ def test_tables_bak_base_table_smoke():
     assert table.table_name == "demo"
     assert table.logger is not None
 
+    # 字段值不再拼进 SQL，而是作为绑定参数原样返回
     keys, values = table._properties2kv({"id": "1", "name": "a"})
     assert keys == ["id", "name"]
-    assert values == ["'1'", "'a'"]
+    assert values == ["1", "a"]
 
-    equal = table._condition2equal({"id": "1"})
-    assert equal == ["id='1'"]
+    equal, params = table._condition2equal({"id": "1"})
+    assert equal == ["id=?"]
+    assert params == ["1"]
 
     assert table.sql_format("select * from table_name") == "select * from demo"
+    # 只替换完整单词，含该子串的标识符不受影响
+    assert table.sql_format("select my_table_name from table_name") == (
+        "select my_table_name from demo"
+    )
 
     # BaseTable.execute() is an abstract hook that must be implemented by
     # subclasses (e.g. SqliteTable); calling it directly is documented to
@@ -446,6 +452,194 @@ def test_to_csv_accepts_dict_condition(tmp_path):
         content = Path(out).read_text(encoding="utf-8")
         assert "alice" in content
         assert "bob" not in content
+    finally:
+        table.close()
+
+
+def test_to_csv_does_not_invoke_shell(tmp_path):
+    """导出 csv 不再拼 shell 命令，改走 sqlite3 + pandas。"""
+    import inspect
+
+    from fundata.tables_bak import core as tables_core
+    from fundata.tables_bak.core import SqliteTable
+
+    source = inspect.getsource(tables_core)
+    assert "run_shell" not in source
+    assert "subprocess" not in source
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "noshell.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "alice"})
+        out = table.to_csv(None, path=str(tmp_path / "all.csv"))
+        lines = Path(out).read_text(encoding="utf-8").strip().splitlines()
+        # 与原先 `sqlite3 -header -csv` 的输出一致：带表头、不带行号索引
+        assert lines[0] == "id,name"
+        assert lines[1] == "1,alice"
+    finally:
+        table.close()
+
+
+def test_to_csv_path_with_shell_metacharacters(tmp_path):
+    """导出路径带空格和 shell 元字符时必须按字面量写文件，而不是被 shell 解释。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "meta.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "alice"})
+
+        weird = tmp_path / "out dir; touch pwned" / "a b.csv"
+        out = table.to_csv(None, path=str(weird))
+        assert Path(out) == weird
+        assert weird.exists()
+        assert not (tmp_path / "pwned").exists()
+    finally:
+        table.close()
+
+
+def test_sql_injection_in_condition_value_is_not_executed(tmp_path):
+    """where 条件值里的单引号只能当普通字符，不能提前闭合字符串改写 SQL。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "inject.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "alice"})
+        table.insert({"id": "2", "name": "bob"})
+
+        # 经典注入载荷：拼接实现会变成 `where id='x' or '1'='1'`，把两行都删掉
+        table.delete({"id": "x' or '1'='1"})
+        assert len(table.select_all()) == 2
+
+        # 同一载荷用于查询时应当匹配不到任何记录
+        assert table.select(condition={"id": "x' or '1'='1"}) == []
+    finally:
+        table.close()
+
+
+def test_sql_injection_in_inserted_value_is_stored_verbatim(tmp_path):
+    """带引号的字段值要原样入库，既不能改写 SQL，也不能被悄悄吃掉引号。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "quote.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "O'Brien"})
+        assert table.select_all() == [{"id": "1", "name": "O'Brien"}]
+    finally:
+        table.close()
+
+
+def test_download_name_is_parameterised(tmp_path):
+    """download() 的数据集名来自调用方，注入载荷只能当普通名字，查不到就返回 None。"""
+    dataset = _index_with_local_source(tmp_path, "demo", "demo.txt", "hello\n")
+    try:
+        assert dataset.download("' or '1'='1", path_root=str(tmp_path)) is None
+        # 原表数据未被破坏
+        assert len(dataset.select_all()) == 1
+    finally:
+        dataset.close()
+
+
+def test_illegal_identifier_is_rejected():
+    """表名/字段名无法参数化，只能靠白名单挡住，非法标识符必须直接拒绝。"""
+    from fundata.exceptions import TableConfigError
+    from fundata.tables_bak.core import BaseTable
+
+    with pytest.raises(TableConfigError):
+        BaseTable(table_name="demo; drop table users")
+    with pytest.raises(TableConfigError):
+        BaseTable(table_name="demo", columns=["id", "name); drop table users --"])
+
+
+def test_empty_condition_does_not_wipe_table(tmp_path):
+    """空条件会被拒绝，不能退化成全表删除，也不能生成 `where ` 这种坏 SQL。"""
+    from fundata.exceptions import TableConfigError
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "empty.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "alice"})
+
+        with pytest.raises(TableConfigError):
+            table.delete({})
+        with pytest.raises(TableConfigError):
+            table.delete({"not_a_column": "x"})
+        assert len(table.select_all()) == 1
+
+        # 显式传 None 才是「作用于全表」
+        table.delete(None)
+        assert table.select_all() == []
+    finally:
+        table.close()
+
+
+def test_count_without_condition_counts_all_rows(tmp_path):
+    """count() 不传条件时统计全表，而不是生成 `where ` 让 SQL 直接报错。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "count.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert({"id": "1", "name": "alice"})
+        table.insert({"id": "2", "name": "bob"})
+        assert table.count() == 2
+        assert table.count({"name": "alice"}) == 1
+    finally:
+        table.close()
+
+
+def test_update_or_insert_requires_condition(tmp_path):
+    """update_or_insert 不给条件时报领域异常，而不是 AttributeError。"""
+    from fundata.exceptions import TableConfigError
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "upsert.db"), table_name="demo", columns=["id", "name"]
+    )
+    try:
+        table.execute(
+            "create table demo (id varchar(50) primary key, name varchar(50))"
+        )
+        with pytest.raises(TableConfigError):
+            table.update_or_insert({"id": "1", "name": "alice"})
+
+        table.update_or_insert({"id": "1", "name": "alice"}, condition={"id": "1"})
+        assert table.select_all() == [{"id": "1", "name": "alice"}]
+        table.update_or_insert({"id": "1", "name": "bob"}, condition={"id": "1"})
+        assert table.select_all() == [{"id": "1", "name": "bob"}]
+    finally:
+        table.close()
+
+
+def test_insert_list_binds_columns_explicitly(tmp_path):
+    """批量插入显式列出字段名，字段顺序与建表顺序不同也不会错位。"""
+    from fundata.tables_bak.core import SqliteTable
+
+    table = SqliteTable(
+        db_path=str(tmp_path / "bulk.db"), table_name="demo", columns=["name", "id"]
+    )
+    try:
+        table.execute("create table demo (id varchar(50), name varchar(50))")
+        table.insert_list([{"id": "1", "name": "alice"}, {"id": "2", "name": "bob"}])
+        # columns 顺序是 (name, id)，建表顺序是 (id, name)。不写字段名的
+        # `insert into demo values (?,?)` 会把 name 写进 id 列。
+        raw = table.execute("select id, name from demo order by id").fetchall()
+        assert raw == [("1", "alice"), ("2", "bob")]
     finally:
         table.close()
 

@@ -127,7 +127,10 @@ class DatasetManage(SqliteTable):
             ``fundrive.drives.lanzou.LanZouDrive`` 实例
         :raises DatasetDownloadError: 记录没有可用地址，或直链下载失败时抛出
         """
-        res = self.select_pd(f"select urls,path from table_name where name='{name}'")
+        # name 来自调用方，必须用参数绑定下发，不能拼进 SQL 字符串。
+        res = self.select_pd(
+            f"select urls,path from {self.table_name} where name = ?", params=(name,)
+        )
 
         if len(res) == 0:
             logger.warning(f"数据集不存在: name={name}")
