@@ -490,6 +490,13 @@ class CriteoData(DataSet):
     """Criteo 数据集处理器。"""
 
     def __init__(self, *args: object, **kwargs: object) -> None:
+        """初始化 Criteo 数据集处理器。
+
+        :param args: 位置参数，透传给 :class:`DataSet`
+        :param kwargs: 关键字参数，支持 ``dataset``（数据集索引管理器）和
+            ``data_path``（原始数据及产物的根目录）
+        :return: 无返回值；实例会配置 Criteo 文件路径和默认采样量
+        """
         super().__init__(*args, **kwargs)
         self.criteo_sample = self.path_root + "/criteo/criteo_sample.txt"
         self.criteo_kaggle = self.path_root + "/criteo/criteo_sample.txt"
@@ -500,7 +507,13 @@ class CriteoData(DataSet):
         self.sample_num = 1000000
 
     def download(self, mode: int = 1) -> None:
-        """按模式下载 Criteo 样例或 Kaggle 数据。"""
+        """按模式下载 Criteo 样例或 Kaggle 数据。
+
+        :param mode: ``1`` 下载样例数据，``2`` 下载 Kaggle 数据并解压
+        :return: 无返回值，文件下载到 ``data_path/criteo``
+        :raises DatasetDownloadError: 索引缺少可用直链或下载失败时抛出
+        :raises NotImplementedError: 记录仅有暂不支持的蓝奏云地址时抛出
+        """
         if mode == 1:
             self.dataset.download("criteo-sample", path_root=self.path_root)
         elif mode == 2:
@@ -607,7 +620,14 @@ class CriteoData(DataSet):
         # return feature_layers, (train.to_dict(orient='list'), train[['label']].to_dict(orient='list')), (test.to_dict(orient='list'), test[['label']].to_dict(orient='list'))
 
     def build_dataset(self, mode: int = 1, batch_size: int = 1024) -> object:
-        """按模式构建批处理后的 Criteo 训练和测试数据。"""
+        """按模式构建批处理后的 Criteo 训练和测试数据。
+
+        :param mode: ``1`` 读取样例数据，``2`` 从 Kaggle 训练集读取默认采样量
+        :param batch_size: ``mode=2`` 时 TensorFlow 数据集的每批记录数
+        :return: 特征层配置、训练 ``tf.data.Dataset`` 和测试 ``tf.data.Dataset`` 的元组
+        :raises ImportError: 未安装 ``fundata[dataset]`` 所需的机器学习依赖时抛出
+        :raises FileNotFoundError: 对应的 Criteo 原始数据不存在时抛出
+        """
         if mode == 1:
             return self._create_criteo_dataset(self.criteo_sample, read_part=False)
         elif mode == 2:

@@ -7,7 +7,12 @@ class WorkApp:
     """管理 fundata 的应用目录。"""
 
     def __init__(self, app_name: str = "fundata", dir_app: str | None = None) -> None:
-        """初始化应用目录配置。"""
+        """初始化应用目录配置。
+
+        :param app_name: 应用名，用于生成未显式指定目录时的默认路径
+        :param dir_app: 应用根目录；不传时依次使用 ``FUNDATA_APP_DIR`` 和默认目录
+        :return: 无返回值；实例提供数据库、日志和公共文件目录路径
+        """
         # 默认路径 /opt/farfarfun/... 需要 root/系统级写权限；非特权环境可通过
         # FUNDATA_APP_DIR 环境变量整体覆盖，或直接传入 dir_app 参数。
         self.dir_app = (

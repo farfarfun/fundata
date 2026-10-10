@@ -153,6 +153,23 @@ def test_public_dataset_methods_have_chinese_docstrings():
         )
 
 
+def test_criteo_and_work_public_apis_have_complete_chinese_docstrings():
+    """审计涉及的 CriteoData 和 WorkApp 公开 API 应说明参数和返回值。"""
+    from fundata.dataset.datas import CriteoData
+    from fundata.work import WorkApp
+
+    for target in (
+        CriteoData.__init__,
+        CriteoData.download,
+        CriteoData.build_dataset,
+        WorkApp.__init__,
+    ):
+        doc = (target.__doc__ or "").strip()
+        assert any("一" <= ch <= "鿿" for ch in doc)
+        assert ":param" in doc
+        assert ":return:" in doc
+
+
 def test_preprocess_steps_respect_overwrite(tmp_path):
     """overwrite=True 必须真的重算，而不是因为目标文件已存在就直接跳过。"""
     import pickle
@@ -473,6 +490,36 @@ def test_download_broken_source_raises_and_cleans_temp(tmp_path):
             dataset.download("demo", path_root=str(root))
         assert not (root / "demo.bin").exists()
         assert not (root / "demo.bin.part").exists()
+    finally:
+        dataset.close()
+
+
+def test_download_failure_hides_url_credentials_and_query(tmp_path):
+    """下载失败的异常文本不得泄露 URL 中的凭据、查询参数或片段。"""
+    from fundata.exceptions import DatasetDownloadError
+    from fundata.manage.core import DatasetManage
+
+    dataset = DatasetManage(db_path=str(tmp_path / "index.db"))
+    dataset.create()
+    dataset.insert(
+        {
+            "name": "demo",
+            "urls": {
+                "source": "file://user:password@example.invalid/file.bin?token=secret#sig"
+            },
+            "path": "demo.bin",
+        }
+    )
+    try:
+        with pytest.raises(DatasetDownloadError) as exc_info:
+            dataset.download("demo", path_root=str(tmp_path / "download"))
+        message = str(exc_info.value)
+        assert "example.invalid/file.bin" in message
+        assert "user" not in message
+        assert "password" not in message
+        assert "token" not in message
+        assert "secret" not in message
+        assert "sig" not in message
     finally:
         dataset.close()
 
