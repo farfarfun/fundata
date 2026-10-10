@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import urllib.request
+from urllib.parse import urlsplit
 from typing import Any
 
 from farlog import getLogger
@@ -31,6 +32,15 @@ def default_db_path() -> str:
         return package_db
 
     return os.path.join(os.path.expanduser("~"), ".fundata", "dataset.db")
+
+
+def _safe_url_for_message(url: str) -> str:
+    """返回不含认证信息、查询参数和片段的 URL 标识。"""
+    parts = urlsplit(url)
+    host = parts.hostname or ""
+    if parts.port is not None:
+        host = f"{host}:{parts.port}"
+    return f"{parts.scheme}://{host}{parts.path}" if parts.scheme else parts.path
 
 
 class DatasetManage(SqliteTable):
@@ -126,8 +136,11 @@ class DatasetManage(SqliteTable):
         except OSError as e:
             if os.path.exists(temp):
                 os.remove(temp)
-            logger.error(f"下载失败: url={url} target={target} error={e}")
-            raise DatasetDownloadError(f"下载失败: url={url}") from e
+            safe_url = _safe_url_for_message(url)
+            logger.error(
+                f"下载失败: url={safe_url} target={target} error={type(e).__name__}"
+            )
+            raise DatasetDownloadError(f"下载失败: url={safe_url}") from e
         os.replace(temp, target)
 
     def download(

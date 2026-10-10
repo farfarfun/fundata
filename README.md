@@ -64,6 +64,16 @@ app.create()
 
 `fundata.dataset` 下还有针对具体数据集的处理类，例如 `ElectronicsData`（Amazon 评论数据的下载、清洗、构建训练集）和 `CriteoData`（Criteo 数据集的特征处理）。
 
+构建 Criteo 数据集前先安装 `dataset` extra，并传入已写入索引的 `DatasetManage` 实例：
+
+```python
+from fundata.dataset import CriteoData
+
+criteo = CriteoData(dataset=dataset, data_path="./download/")
+criteo.download(mode=1)  # 下载样例；mode=2 下载并解压 Kaggle 数据
+feature_layers, train_data, test_data = criteo.build_dataset(mode=1)
+```
+
 ## 现状说明
 
 `fundata.work` / `fundata.manage` / `fundata.tables_bak` / `fundata.dataset` 可正常导入；构建 Criteo 数据集时需要额外安装 `dataset` extra。
