@@ -4,6 +4,10 @@
 
 ## [未发布]
 
+### 破坏性变更
+
+- Python 最低版本提升至 3.12；使用 3.10/3.11 的环境需升级解释器后再安装新版本。`dataset` extra 的旧环境标记已移除。
+
 ### 修复
 
 - **SQL 注入**：`DatasetManage.download()` 把调用方传入的 `name` 直接拼进 `where name='{name}'`；`BaseTable._properties2kv()`/`_condition2equal()` 也把所有字段值拼进 SQL 字符串（前者只是粗暴地把 `'` 删掉，后者连删都没删）。现在字段值一律走 sqlite 的 `?` 参数绑定；表名、字段名这类无法参数化的标识符在 `BaseTable.__init__()` 就用白名单 `[A-Za-z_][A-Za-z0-9_]*` 校验，非法标识符直接抛 `TableConfigError`。

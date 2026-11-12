@@ -22,10 +22,7 @@ pip install fundata
 pip install "fundata[dataset]"
 ```
 
-基础包支持 Python 3.10。`dataset` extra 里 TensorFlow/Keras 这条链路带
-`python_version >= '3.11'` 标记，只在 Python 3.11+ 上安装：keras 从 3.13 起才要求
-Python 3.11，在 3.10 上能解析到的最高版本仍落在 Keras 安全公告的受影响区间内。
-`scikit-learn` 与 Keras 无关，在 3.10 上照常安装。
+基础包和 `dataset` extra 均要求 Python 3.12 或更高版本。
 
 `pyproject.toml` 中已声明的 `dependencies` 为 `numpy`、`pandas`、`funshell`、`farlog`、`tqdm`，安装后 `fundata`（顶层）、`fundata.work`、`fundata.manage`、`fundata.tables_bak`、`fundata.dataset` 均可正常导入。构建 Criteo 数据集时需要额外安装 `dataset` extra。
 
